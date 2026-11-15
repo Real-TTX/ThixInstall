@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de" data-app="thixinstall">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#f5f4f1" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#151514" media="(prefers-color-scheme: dark)" />
+  <meta name="robots" content="noindex" />
+  <title>Offline · ThixInstall</title>
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <script src="/matui/matui.boot.js"></script>
+  <link rel="stylesheet" href="/matui/matui.css" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <!-- Shown by the service worker when a page cannot be loaded. It tries again by itself as soon as the network is back (and every 10 seconds), and by the button. -->
+  <main class="mat-auth" id="ti-offline-page" data-from="">
+    <div class="mat-auth__card">
+      <div class="mat-auth__brand">
+        <img class="ti-logo" src="/img/logo.svg" alt="ThixInstall" width="56" height="56" />
+        <h1>Keine Verbindung</h1>
+        <p class="mat-muted">ThixInstall.Cloud ist gerade nicht erreichbar. Die zuletzt geladenen Listen (Geräte, Aufträge, Pakete) bleiben verfügbar; alles andere braucht das Netz.
+          Diese Seite versucht es von selbst erneut, sobald die Verbindung zurück ist.</p>
+      </div>
+      <p class="mat-muted ti-center" id="ti-retry-status" role="status" hidden>Noch keine Verbindung.</p>
+      <div class="mat-btn-row mat-btn-row--plain ti-center">
+        <button type="button" class="mat-btn mat-btn--primary" id="ti-retry">Erneut versuchen</button>
+        <a class="mat-btn mat-btn--secondary" href="/Devices">Zuletzt geladene Geräte</a>
+      </div>
+    </div>
+  </main>
+  <script src="/js/offline.js"></script>
+</body>
+</html>

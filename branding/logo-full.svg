@@ -1,0 +1,26 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="800" height="200" viewBox="0 0 800 200">
+  <!-- ThixInstall full logo: app icon + word mark ("Thix" ink, "Install" brand teal). For headers, README, about pages. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#36C7A8"/>
+      <stop offset="1" stop-color="#0B7566"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E3F6F1"/>
+    </linearGradient>
+  </defs>
+  <g transform="scale(0.78125)">
+    <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#tile)"/>
+    <path d="M66 140 L88 112 H168 L190 140 Z" fill="#FFFFFF" fill-opacity="0.42" stroke="#FFFFFF" stroke-opacity="0.42" stroke-width="8" stroke-linejoin="round"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="128" y1="44" x2="128" y2="126"/>
+      <polyline points="94,94 128,128 162,94"/>
+    </g>
+    <rect x="58" y="136" width="140" height="80" rx="18" fill="url(#front)"/>
+    <line x1="102" y1="170" x2="154" y2="170" stroke="#13917C" stroke-width="12" stroke-linecap="round"/>
+  </g>
+  <text x="226" y="134" font-family="'SF Pro Display', 'Segoe UI Variable Display', 'Segoe UI', Inter, 'Helvetica Neue', Arial, sans-serif" font-size="104" font-weight="650" letter-spacing="-2">
+    <tspan fill="#111827">Thix</tspan><tspan fill="#0F7B6C">Install</tspan>
+  </text>
+</svg>

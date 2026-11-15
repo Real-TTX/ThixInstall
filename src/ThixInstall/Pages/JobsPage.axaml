@@ -1,0 +1,125 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ThixInstall.Controls"
+             x:Class="ThixInstall.Pages.JobsPage">
+  <!--
+    The jobs of the agent: what runs, what waits, what was done (this device, the cloud, a profile, a bundle). The list at
+    the left, the chosen job with its output at the right; its actions below it.
+  -->
+  <UserControl.Styles>
+    <Style Selector="Border.jobrow">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Border.jobrow:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    </Style>
+    <Style Selector="Border.jobrow.selected">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftStrongBrush}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Background="{DynamicResource SurfaceBrush}">
+    <DockPanel Margin="28,22,28,20">
+      <StackPanel DockPanel.Dock="Top">
+        <TextBlock Text="Aufträge" Theme="{StaticResource PageTitle}" />
+        <TextBlock x:Name="Summary" Theme="{StaticResource MutedText}" Margin="0,4,0,14" />
+        <controls:InfoBar x:Name="Message" />
+        <controls:Toolbar>
+          <ComboBox x:Name="StateChoice" MinWidth="170" SelectedIndex="0" AutomationProperties.Name="Status">
+            <ComboBoxItem Content="Alle Aufträge" />
+            <ComboBoxItem Content="Offen" />
+            <ComboBoxItem Content="Fehlgeschlagen" />
+            <ComboBoxItem Content="Erledigt" />
+          </ComboBox>
+          <ComboBox x:Name="OriginChoice" MinWidth="170" SelectedIndex="0" AutomationProperties.Name="Herkunft">
+            <ComboBoxItem Content="Alle Herkünfte" />
+            <ComboBoxItem Content="Dieses Gerät" />
+            <ComboBoxItem Content="Aus der Cloud" />
+            <ComboBoxItem Content="Profil" />
+          </ComboBox>
+        </controls:Toolbar>
+      </StackPanel>
+
+      <Grid x:Name="Split" ColumnDefinitions="2*,16,3*">
+        <!-- List -->
+        <Panel>
+          <ScrollViewer x:Name="ListScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl x:Name="Rows">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Classes="jobrow" Classes.selected="{Binding IsSelected}" Padding="12,10" Margin="0,0,0,4" PointerPressed="OnRowPressed">
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
+                      <controls:IconView Grid.RowSpan="2" Data="{Binding GlyphData}" Width="18" Height="18" Margin="0,2,12,0" VerticalAlignment="Top"
+                                         Foreground="{DynamicResource TextMutedBrush}" />
+                      <DockPanel Grid.Column="1">
+                        <controls:StatusChip DockPanel.Dock="Right" Text="{Binding ShortState}" Tone="{Binding StateTone}" Margin="8,0,0,0" />
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      </DockPanel>
+                      <TextBlock Grid.Row="1" Grid.Column="1" Theme="{StaticResource FaintText}" TextTrimming="CharacterEllipsis" Margin="0,3,0,0">
+                        <Run Text="{Binding TimeText}" /><Run Text=" · " /><Run Text="{Binding OriginText}" />
+                      </TextBlock>
+                      <ProgressBar Grid.Row="2" Grid.Column="1" Height="4" MinHeight="4" Margin="0,8,0,0" IsVisible="{Binding IsRunning}"
+                                   IsIndeterminate="{Binding !HasProgress}" Value="{Binding ProgressValue}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+          <StackPanel x:Name="EmptyState" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="320">
+            <controls:IconView Data="{StaticResource Icon.ListChecks}" Width="40" Height="40" Foreground="{DynamicResource TextFaintBrush}" HorizontalAlignment="Center" />
+            <TextBlock x:Name="EmptyText" TextAlignment="Center" TextWrapping="Wrap" Theme="{StaticResource MutedText}" FontSize="14"
+                       Text="Noch keine Aufträge. Installiere eine App aus dem Katalog oder führe ein Skript aus." />
+          </StackPanel>
+        </Panel>
+
+        <!-- Detail -->
+        <Border Grid.Column="2" x:Name="DetailCard" Theme="{StaticResource Card}" Padding="20,18" IsVisible="False">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Top" Spacing="10">
+              <DockPanel>
+                <controls:StatusChip x:Name="DetailState" DockPanel.Dock="Right" Margin="12,4,0,0" VerticalAlignment="Top" />
+                <TextBlock x:Name="DetailTitle" Theme="{StaticResource SectionTitle}" FontSize="18" TextWrapping="Wrap" />
+              </DockPanel>
+              <TextBlock x:Name="DetailStatus" Theme="{StaticResource MutedText}" />
+              <ProgressBar x:Name="DetailProgress" Height="4" MinHeight="4" IsVisible="False" />
+              <Grid x:Name="DetailFacts" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,4,0,8">
+                <TextBlock Text="Herkunft" Theme="{StaticResource MutedText}" Margin="0,2,22,2" />
+                <TextBlock Grid.Column="1" x:Name="DetailOrigin" Margin="0,2" TextWrapping="Wrap" />
+                <TextBlock Grid.Row="1" Text="Erstellt" Theme="{StaticResource MutedText}" Margin="0,2,22,2" />
+                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="DetailCreated" Margin="0,2" />
+                <TextBlock Grid.Row="2" Text="Dauer" Theme="{StaticResource MutedText}" Margin="0,2,22,2" />
+                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="DetailDuration" Margin="0,2" />
+                <TextBlock Grid.Row="3" Text="Exitcode" Theme="{StaticResource MutedText}" Margin="0,2,22,2" />
+                <TextBlock Grid.Row="3" Grid.Column="1" x:Name="DetailExit" Margin="0,2" />
+                <TextBlock Grid.Row="4" Text="Version" Theme="{StaticResource MutedText}" Margin="0,2,22,2" />
+                <TextBlock Grid.Row="4" Grid.Column="1" x:Name="DetailVersion" Margin="0,2" />
+              </Grid>
+              <TextBlock Text="Ausgabe" FontWeight="SemiBold" FontSize="13" />
+            </StackPanel>
+
+            <controls:ActionBar DockPanel.Dock="Bottom" Margin="0,14,0,0">
+              <Button x:Name="RetryButton" Click="OnRetryClick">
+                <controls:IconLabel Icon="{StaticResource Icon.Sync}" Text="Erneut ausführen" />
+              </Button>
+              <Button x:Name="CopyButton" Click="OnCopyClick">
+                <controls:IconLabel Icon="{StaticResource Icon.Copy}" Text="Ausgabe kopieren" />
+              </Button>
+              <Button x:Name="CancelButton" Theme="{StaticResource DangerButton}" Click="OnCancelClick" controls:ActionBar.Separated="True">
+                <controls:IconLabel Icon="{StaticResource Icon.Stop}" Text="Abbrechen" />
+              </Button>
+            </controls:ActionBar>
+
+            <Border Background="{DynamicResource SubtleBrush}" CornerRadius="10" Padding="12,10">
+              <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                <SelectableTextBlock x:Name="DetailOutput" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="12" />
+              </ScrollViewer>
+            </Border>
+          </DockPanel>
+        </Border>
+      </Grid>
+    </DockPanel>
+  </Border>
+</UserControl>

@@ -1,0 +1,72 @@
+@page "/Actions/Detail"
+@model ThixInstall.Cloud.Pages.Actions.DetailModel
+@{
+    var a = Model.Action;
+    ViewData["Title"] = a.Title;
+    ViewData["PageSub"] = $"{ActionService.StateName(a.State)} · {a.DeviceName}";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Verwaltung", null), ("Aufträge", "/Actions"), (a.Title, null) };
+    ViewData["Width"] = "narrow";
+}
+
+@if (a.State is ActionState.Pending or ActionState.Running)
+{
+    <div class="mat-alert mat-alert--info" role="status">
+        @Ui.Icon("info")
+        <div class="mat-alert__body">@(a.State == ActionState.Pending ? "Der Auftrag wartet darauf, dass das Gerät ihn abholt." : "Das Gerät führt den Auftrag gerade aus.") Diese Seite zeigt den Stand beim Laden.</div>
+    </div>
+}
+
+<div class="mat-card">
+    <div class="mat-card__body">
+        <dl class="ti-facts">
+            <dt>@Ui.Icon("check-circle")Status</dt><dd><span class="mat-pill @ActionService.StatePill(a.State)">@ActionService.StateName(a.State)</span></dd>
+            <dt>@Ui.Icon("rocket")Art</dt><dd>@ActionService.KindName(a.Kind)</dd>
+            <dt>@Ui.Icon(Ui.OsIcon(a.Os))Gerät</dt><dd><a href="/Devices/Detail?id=@a.DeviceId">@a.DeviceName</a></dd>
+            @if (a.PackageName is not null)
+            {
+                <dt>@Ui.Icon("box")App</dt><dd>@a.PackageName</dd>
+            }
+            @if (a.ScriptName is not null)
+            {
+                <dt>@Ui.Icon("terminal")Skript</dt><dd>@a.ScriptName</dd>
+            }
+            <dt>@Ui.Icon("route")Herkunft</dt><dd>@ActionService.OriginName(a.Origin)@(a.RequestedBy is null ? "" : $" ({a.RequestedBy})")@(a.ProfileName is null ? "" : $" (Profil {a.ProfileName})")</dd>
+            <dt>@Ui.Icon("calendar")Angelegt</dt><dd>@Dates.Stamp(a.CreateDate)</dd>
+            <dt>@Ui.Icon("play")Gestartet</dt><dd>@Dates.Stamp(a.StartedDate)</dd>
+            <dt>@Ui.Icon("clock")Fertig</dt><dd>@Dates.Stamp(a.FinishedDate)</dd>
+            @if (a.ExitCode is { } code)
+            {
+                <dt>@Ui.Icon("code")Exit-Code</dt><dd class="mat-mono">@code</dd>
+            }
+            @if (a.InstalledVersion is not null)
+            {
+                <dt>@Ui.Icon("tag")Installierte Version</dt><dd class="mat-mono">@a.InstalledVersion</dd>
+            }
+        </dl>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(a.Output))
+{
+    <div class="mat-card">
+        <div class="mat-card__head">
+            <h2 class="mat-card__title">@Ui.Icon("terminal")Ausgabe</h2>
+            <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" data-copy="#action-output" aria-label="Ausgabe kopieren" data-tip="Kopieren">@Ui.Icon("copy")</button>
+        </div>
+        <div class="mat-card__body">
+            <pre class="ti-output" id="action-output">@a.Output</pre>
+        </div>
+    </div>
+}
+
+<form method="post">
+    <div class="mat-btn-row">
+        <a class="mat-btn mat-btn--secondary" href="/Actions">@Ui.Icon("back")<span>Zurück</span></a>
+        <a class="mat-btn mat-btn--secondary" href="/Devices/Detail?id=@a.DeviceId&amp;tab=actions">@Ui.Icon("monitor")<span>Zum Gerät</span></a>
+        @if (a.State == ActionState.Pending)
+        {
+            <span class="mat-btn-row__spacer"></span>
+            <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Cancel" asp-route-id="@a.Id" data-confirm="Diesen Auftrag abbrechen?" data-confirm-ok="Abbrechen" data-confirm-danger>@Ui.Icon("x")<span>Auftrag abbrechen</span></button>
+        }
+    </div>
+</form>

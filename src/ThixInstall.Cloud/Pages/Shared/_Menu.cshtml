@@ -1,0 +1,53 @@
+@model string
+@inject CurrentUser Me
+@*
+    The menus (MatDesign SHELL-01 .. SHELL-19): one panel per menu of the switcher at the foot, the one of the page shown.
+    - manage:  the main action first (put a bundle together), the devices, their actions, the bundles; for administrators the catalog and the profiles
+    - account: general, security
+    - admin:   the accounts, the download cache, the settings (administrators only)
+*@
+@{
+    var path = Context.Request.Path.Value ?? "/";
+    string Cls(bool active) => "mat-nav__item" + (active ? " is-active" : string.Empty);
+    string Cur(bool active) => active ? "page" : null!;
+    var onStart = path == "/";
+    var onDevices = Menu.Under(path, "/Devices");
+    var onActions = Menu.Under(path, "/Actions");
+    var onBundles = Menu.Under(path, "/Bundles");
+    var onPackages = Menu.Under(path, "/Catalog/Packages");
+    var onScripts = Menu.Under(path, "/Catalog/Scripts");
+    var onProfiles = Menu.Under(path, "/Profiles");
+}
+<nav class="mat-nav__scroll" aria-label="Verwaltung" data-nav-panel="manage" hidden="@(Model != "manage")">
+    <ul class="mat-nav__list">
+        <li><a class="mat-nav__item mat-nav__item--primary" href="/" aria-current="@Cur(onStart)">@Ui.Icon("plus")<span>Paket zusammenstellen</span></a></li>
+        <li><a class="@Cls(onDevices)" href="/Devices" aria-current="@Cur(onDevices)">@Ui.Icon("monitor")<span>Geräte</span></a></li>
+        <li><a class="@Cls(onActions)" href="/Actions" aria-current="@Cur(onActions)">@Ui.Icon("list-checks")<span>Aufträge</span></a></li>
+        <li><a class="@Cls(onBundles)" href="/Bundles" aria-current="@Cur(onBundles)">@Ui.Icon("download")<span>Pakete</span></a></li>
+        @if (Me.IsAdmin)
+        {
+            <li class="mat-nav__group" role="presentation"><span class="mat-nav__group-title">Katalog</span></li>
+            <li><a class="@Cls(onPackages)" href="/Catalog/Packages" aria-current="@Cur(onPackages)">@Ui.Icon("box")<span>Apps</span></a></li>
+            <li><a class="@Cls(onScripts)" href="/Catalog/Scripts" aria-current="@Cur(onScripts)">@Ui.Icon("terminal")<span>Skripte</span></a></li>
+            <li><a class="@Cls(onProfiles)" href="/Profiles" aria-current="@Cur(onProfiles)">@Ui.Icon("template")<span>Profile</span></a></li>
+        }
+    </ul>
+</nav>
+
+<nav class="mat-nav__scroll" aria-label="Konto" data-nav-panel="account" hidden="@(Model != "account")">
+    <ul class="mat-nav__list">
+        <li><a class="@Cls(path.Equals("/Account", StringComparison.OrdinalIgnoreCase))" href="/Account" aria-current="@Cur(path.Equals("/Account", StringComparison.OrdinalIgnoreCase))">@Ui.Icon("user")<span>Allgemein</span></a></li>
+        <li><a class="@Cls(Menu.Under(path, "/Account/Security"))" href="/Account/Security" aria-current="@Cur(Menu.Under(path, "/Account/Security"))">@Ui.Icon("lock")<span>Sicherheit</span></a></li>
+    </ul>
+</nav>
+
+@if (Me.IsAdmin)
+{
+    <nav class="mat-nav__scroll" aria-label="Administration" data-nav-panel="admin" hidden="@(Model != "admin")">
+        <ul class="mat-nav__list">
+            <li><a class="@Cls(Menu.Under(path, "/Admin/Users"))" href="/Admin/Users" aria-current="@Cur(Menu.Under(path, "/Admin/Users"))">@Ui.Icon("users")<span>Benutzer</span></a></li>
+            <li><a class="@Cls(Menu.Under(path, "/Admin/Cache"))" href="/Admin/Cache" aria-current="@Cur(Menu.Under(path, "/Admin/Cache"))">@Ui.Icon("hard-drive")<span>Download-Cache</span></a></li>
+            <li><a class="@Cls(Menu.Under(path, "/Admin/Settings"))" href="/Admin/Settings" aria-current="@Cur(Menu.Under(path, "/Admin/Settings"))">@Ui.Icon("settings")<span>Einstellungen</span></a></li>
+        </ul>
+    </nav>
+}

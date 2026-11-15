@@ -1,0 +1,105 @@
+@page "/b/{token}"
+@model ThixInstall.Cloud.Pages.Bundles.PublicModel
+@{
+    var b = Model.Bundle;
+    Layout = Model.SignedIn ? "_Layout" : "_LayoutPublic";
+    ViewData["Title"] = b.Name;
+    ViewData["PageSub"] = $"Paket für {Ui.OsName(b.Os)} · {Ui.Count(b.Packages.Count, "App", "Apps")} · {Ui.Count(b.Scripts.Count, "Skript", "Skripte")}";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Verwaltung", null), ("Pakete", "/Bundles"), (b.Name, null) };
+    ViewData["Width"] = "narrow";
+}
+
+@if (!Model.SignedIn)
+{
+    <div class="ti-public__head">
+        <h1>@b.Name</h1>
+        <p class="mat-muted">Paket für @Ui.OsName(b.Os) · @Ui.Count(b.Packages.Count, "App", "Apps") · @Ui.Count(b.Scripts.Count, "Skript", "Skripte")</p>
+    </div>
+}
+
+@if (Model.DownloadError is not null)
+{
+    <div class="mat-alert mat-alert--danger" role="alert">
+        @Ui.Icon("x-circle")
+        <div class="mat-alert__body">@Model.DownloadError</div>
+    </div>
+}
+
+<div class="mat-card ti-download">
+    <div class="mat-card__body">
+        <div class="ti-download__buttons">
+            @if (b.Os == TargetOs.Windows)
+            {
+                <a class="mat-btn mat-btn--primary mat-btn--lg" href="@Model.DownloadUrl("win-x64")" download>@Ui.Icon("windows")<span>Für Windows herunterladen</span></a>
+            }
+            else
+            {
+                <a class="mat-btn mat-btn--primary mat-btn--lg" href="@Model.DownloadUrl("osx-arm64")" download>@Ui.Icon("apple")<span>Für Mac mit Apple-Chip</span></a>
+                <a class="mat-btn mat-btn--secondary mat-btn--lg" href="@Model.DownloadUrl("osx-x64")" download>@Ui.Icon("apple")<span>Für Mac mit Intel-Chip</span></a>
+            }
+        </div>
+        <ol class="ti-steps">
+            @if (b.Os == TargetOs.Windows)
+            {
+                <li>Die heruntergeladene Datei starten und die Frage nach Administratorrechten bestätigen.</li>
+                <li>ThixInstall lädt die Apps aus dieser Cloud und installiert sie nacheinander – ohne weitere Fragen.</li>
+            }
+            else
+            {
+                <li>Die Zip-Datei öffnen und ThixInstall starten (beim ersten Mal: Rechtsklick › Öffnen).</li>
+                <li>ThixInstall findet das Paket neben sich und installiert die Apps nach /Programme.</li>
+            }
+            <li>Dasselbe Programm kann später wieder gestartet werden: es bringt die Apps auf den neuesten Stand.</li>
+        </ol>
+        @if (b.IncludesAgent)
+        {
+            <p class="mat-hint">@Ui.Icon("monitor") Zum Schluss wird ThixInstall selbst installiert und meldet den Rechner @(b.OwnerName is null ? "" : $"im Konto von {b.OwnerName} ")an@(b.ProfileName is null ? "" : $" (Profil „{b.ProfileName}“)").
+                @if (!b.CanEnroll) { <strong>Dieses Paket ist älter als @ApiContract.BundleEnrollmentDays Tage und meldet keine Geräte mehr an.</strong> }</p>
+        }
+    </div>
+</div>
+
+<div class="mat-card">
+    <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("box")Inhalt</h2></div>
+    <ul class="mat-itemlist">
+        @foreach (var p in b.Packages)
+        {
+            <li class="mat-item">
+                <div class="mat-item__main">
+                    <span class="mat-item__lead">@Ui.AppIcon(p.Id, p.Key, p.Name, p.HasIcon, "sm")</span>
+                    <span class="mat-item__body"><span class="mat-item__title">@p.Name</span><span class="mat-item__text">@p.Category</span></span>
+                </div>
+            </li>
+        }
+        @foreach (var s in b.Scripts)
+        {
+            <li class="mat-item">
+                <div class="mat-item__main">
+                    <span class="mat-item__lead"><span class="ti-appicon ti-appicon--sm ti-appicon--script" aria-hidden="true">@Ui.Icon("terminal")</span></span>
+                    <span class="mat-item__body"><span class="mat-item__title">@s.Name</span><span class="mat-item__text">Skript · @s.Category</span></span>
+                </div>
+            </li>
+        }
+        @if (b.Packages.Count + b.Scripts.Count == 0)
+        {
+            <li class="mat-item"><div class="mat-item__main"><span class="mat-item__body"><span class="mat-item__title">Nur ThixInstall</span><span class="mat-item__text">Das Gerät meldet sich an und bekommt seine Apps über das Profil.</span></span></div></li>
+        }
+    </ul>
+</div>
+
+<div class="mat-card">
+    <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("link")Link weitergeben</h2></div>
+    <div class="mat-card__body mat-form">
+        <div class="mat-field">
+            <label class="mat-label" for="bundle-link">Wer diesen Link hat, kann das Paket herunterladen.</label>
+            <div class="ti-copyline">
+                <input class="mat-input mat-mono" id="bundle-link" value="@Model.Link" readonly />
+                <button type="button" class="mat-btn mat-btn--secondary" data-copy="#bundle-link">@Ui.Icon("copy")<span>Kopieren</span></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mat-btn-row">
+    <a class="mat-btn mat-btn--secondary" href="/?os=@ApiContract.ToQuery(b.Os)">@Ui.Icon("plus")<span>Neues Paket</span></a>
+</div>

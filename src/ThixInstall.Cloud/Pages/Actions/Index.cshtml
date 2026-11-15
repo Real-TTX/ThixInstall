@@ -1,0 +1,29 @@
+@page "/Actions"
+@model ThixInstall.Cloud.Pages.Actions.IndexModel
+@{
+    ViewData["Title"] = "Aufträge";
+    ViewData["PageSub"] = "Was die Geräte installiert, aktualisiert und ausgeführt haben – und was noch wartet.";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Verwaltung", null), ("Aufträge", null) };
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="Model.Toolbar" />
+
+    @if (Model.Items.Count == 0)
+    {
+        var first = Model.Toolbar.Total == 0;
+        <partial name="_Empty" model="@(new EmptyStateModel("list-checks", first ? "Noch keine Aufträge" : "Nichts gefunden",
+            first ? "Aufträge schickst du einem Gerät auf seiner Seite (Geräte › Gerät › Auftrag senden). Auch was ein Gerät selbst installiert, steht hier." : "Kein Auftrag passt zur Suche oder zu den Filtern.",
+            first, "/Devices", "Zu den Geräten", Model.Toolbar.UrlReset()))" />
+    }
+    else
+    {
+        <partial name="_ActionTable" model="@((Model.Items, true))" />
+    }
+
+    <partial name="_Pager" model="Model.Pager" />
+
+    <div class="mat-actions">
+        <a class="mat-btn mat-btn--primary" href="/Devices">@Ui.Icon("rocket")<span>Auftrag senden …</span></a>
+    </div>
+</div>

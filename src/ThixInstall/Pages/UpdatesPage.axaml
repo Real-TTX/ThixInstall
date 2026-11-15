@@ -1,0 +1,59 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ThixInstall.Controls"
+             x:Class="ThixInstall.Pages.UpdatesPage">
+  <!-- The installed catalog apps that have a newer version: one by one or all at once, or automatically every day. -->
+  <Border Background="{DynamicResource SurfaceBrush}">
+    <DockPanel Margin="28,22,28,20">
+      <StackPanel DockPanel.Dock="Top">
+        <TextBlock Text="Updates" Theme="{StaticResource PageTitle}" />
+        <TextBlock x:Name="Summary" Theme="{StaticResource MutedText}" Margin="0,4,0,14" />
+        <controls:InfoBar x:Name="Message" />
+        <Border Theme="{StaticResource Card}" Padding="18,2" Margin="0,0,0,16">
+          <controls:SettingRow Title="Apps automatisch aktualisieren" BorderThickness="0"
+                               Description="Einmal am Tag installiert ThixInstall neuere Versionen der Apps aus dem Katalog – ohne Rückfrage.">
+            <ToggleSwitch x:Name="AutoUpdateSwitch" OnContent="" OffContent="" AutomationProperties.Name="Apps automatisch aktualisieren" />
+          </controls:SettingRow>
+        </Border>
+      </StackPanel>
+
+      <controls:ActionBar DockPanel.Dock="Bottom" Margin="0,14,0,0">
+        <Button x:Name="UpdateAllButton" Theme="{StaticResource PrimaryButton}" Click="OnUpdateAllClick">
+          <controls:IconLabel x:Name="UpdateAllLabel" Icon="{StaticResource Icon.Sync}" Text="Alle aktualisieren" />
+        </Button>
+        <Button Click="OnCatalogClick">
+          <controls:IconLabel Icon="{StaticResource Icon.Apps}" Text="Zum Katalog" />
+        </Button>
+      </controls:ActionBar>
+
+      <Panel>
+        <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <ItemsControl x:Name="Rows">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="6,12">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                    <controls:AppIcon Size="40" NameText="{Binding Name}" Key="{Binding Key}" Image="{Binding Icon}" />
+                    <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center" Spacing="2">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding VersionChange}" Theme="{StaticResource MutedText}" />
+                    </StackPanel>
+                    <controls:StatusChip Grid.Column="2" Margin="0,0,12,0" Text="{Binding SourceText}" Tone="Neutral" />
+                    <Button Grid.Column="3" Click="OnUpdateOneClick" IsEnabled="{Binding !IsBusy}" ToolTip.Tip="Diese App aktualisieren">
+                      <controls:IconLabel Icon="{StaticResource Icon.Sync}" Text="Aktualisieren" />
+                    </Button>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+        <StackPanel x:Name="EmptyState" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="420">
+          <controls:IconView Data="{StaticResource Icon.Success}" Width="44" Height="44" Foreground="{DynamicResource SuccessBrush}" HorizontalAlignment="Center" />
+          <TextBlock x:Name="EmptyText" Text="Alle Apps aus dem Katalog sind aktuell." TextAlignment="Center" TextWrapping="Wrap" FontSize="15" />
+        </StackPanel>
+      </Panel>
+    </DockPanel>
+  </Border>
+</UserControl>

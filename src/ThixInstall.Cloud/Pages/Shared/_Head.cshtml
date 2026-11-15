@@ -1,0 +1,24 @@
+@model string
+@*
+    The head of every page (with and without the menu): the viewport for the installed app (safe areas, no zoom into fields, the pinch zoom stays),
+    the colours of the status bar that match the page background in light and dark, the PWA links, the toolkit.
+*@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#f5f4f1" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#151514" media="(prefers-color-scheme: dark)" />
+@if (ViewData["Indexable"] is not true) { <meta name="robots" content="noindex" /> }
+<meta name="description" content="ThixInstall – Apps und Skripte für Windows und macOS mit einem Klick installieren, Geräte verwalten." />
+<title>@(Model == Ui.AppName ? Ui.AppName : $"{Model} · {Ui.AppName}")</title>
+<link rel="icon" type="image/svg+xml" href="~/img/favicon.svg" />
+<link rel="icon" type="image/x-icon" href="~/img/favicon.ico" sizes="16x16 32x32 48x48" />
+<link rel="manifest" href="~/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="~/img/apple-touch-icon.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="ThixInstall" />
+<script src="~/matui/matui.boot.js" asp-append-version="true"></script>
+<link rel="stylesheet" href="~/matui/matui.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />

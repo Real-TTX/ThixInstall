@@ -1,0 +1,6 @@
+@model string
+@* The areas of the account (UI rule: one item with several areas has tabs): each tab is a page of its own. *@
+<ti-tabs label="Konto">
+    <ti-tab href="/Account" active="@(Model == "general")" icon="user">Allgemein</ti-tab>
+    <ti-tab href="/Account/Security" active="@(Model == "security")" icon="lock">Sicherheit</ti-tab>
+</ti-tabs>

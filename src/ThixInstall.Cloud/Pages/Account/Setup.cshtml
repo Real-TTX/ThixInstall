@@ -1,0 +1,26 @@
+@page "/Account/Setup"
+@model ThixInstall.Cloud.Pages.Account.SetupModel
+@{
+    Layout = "_LayoutAuth";
+    ViewData["Title"] = "Einrichten";
+}
+
+<div class="mat-auth__card">
+    <div class="mat-auth__brand">
+        @Ui.Logo("lg")
+        <h1>ThixInstall.Cloud einrichten</h1>
+        <p class="mat-muted">Willkommen! Lege das erste Konto an. Es verwaltet Katalog, Profile und Geräte und ist zugleich dein Konto für die ThixInstall-App.</p>
+    </div>
+
+    <form class="mat-form" method="post" novalidate id="setup-form">
+        <partial name="_FormSummary" model="ViewData.ModelState" />
+        <ti-field name="UserName" label="Benutzername" required autocomplete="username" value="@Model.UserName" autofocus maxlength="64"
+                  hint="Zum Anmelden im Browser und in der App: a–z, Ziffern und . _ - @@" msg-required="Bitte einen Benutzernamen eingeben." />
+        <ti-field name="DisplayName" label="Anzeigename" optional autocomplete="name" value="@Model.DisplayName" maxlength="120" />
+        <ti-field name="Password" kind="password" label="Passwort" required autocomplete="new-password" minlength="@Passwords.MinLength" hint="Mindestens @Passwords.MinLength Zeichen." msg-required="Bitte ein Passwort wählen." />
+        <ti-field name="Repeat" kind="password" label="Passwort wiederholen" required autocomplete="new-password" msg-required="Bitte das Passwort wiederholen." />
+        <div class="mat-btn-row mat-btn-row--plain">
+            <button type="submit" class="mat-btn mat-btn--primary mat-btn--block">@Ui.Icon("check")<span>Einrichten</span></button>
+        </div>
+    </form>
+</div>

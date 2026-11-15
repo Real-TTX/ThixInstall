@@ -1,0 +1,64 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ThixInstall.Controls"
+             x:Class="ThixInstall.Pages.ScriptsPage">
+  <!-- The scripts ("Makros") of the catalog for this system: what they do, in which shell and with which rights; run one. -->
+  <Border Background="{DynamicResource SurfaceBrush}">
+    <DockPanel Margin="28,22,28,20">
+      <StackPanel DockPanel.Dock="Top">
+        <TextBlock Text="Skripte" Theme="{StaticResource PageTitle}" />
+        <TextBlock x:Name="Summary" Theme="{StaticResource MutedText}" Margin="0,4,0,14" />
+        <controls:InfoBar x:Name="Message" />
+        <controls:Toolbar x:Name="ToolbarRow">
+          <ComboBox x:Name="CategoryChoice" MinWidth="180" AutomationProperties.Name="Kategorie" />
+          <ComboBox x:Name="ContextChoice" MinWidth="200" SelectedIndex="0" AutomationProperties.Name="Rechte">
+            <ComboBoxItem Content="Alle Rechte" />
+            <ComboBoxItem Content="Als Benutzer" />
+            <ComboBoxItem Content="Mit Administratorrechten" />
+          </ComboBox>
+        </controls:Toolbar>
+      </StackPanel>
+
+      <controls:ActionBar DockPanel.Dock="Bottom" Margin="0,14,0,0">
+        <Button Click="OnJobsClick">
+          <controls:IconLabel Icon="{StaticResource Icon.ListChecks}" Text="Zu den Aufträgen" />
+        </Button>
+      </controls:ActionBar>
+
+      <Panel>
+        <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <ItemsControl x:Name="Rows">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="6,12">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Border Width="40" Height="40" CornerRadius="10" Background="{DynamicResource AccentSoftBrush}" VerticalAlignment="Top">
+                      <controls:IconView Data="{StaticResource Icon.Terminal}" Width="20" Height="20" Foreground="{DynamicResource AccentTextBrush}" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="14,0" Spacing="4">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding Description}" Theme="{StaticResource MutedText}" IsVisible="{Binding HasDescription}" />
+                      <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
+                        <controls:StatusChip Text="{Binding Category}" Tone="Neutral" />
+                        <controls:StatusChip Text="{Binding ShellText}" Tone="Accent" />
+                        <controls:StatusChip Text="{Binding ContextText}" Tone="{Binding ContextTone}" />
+                      </StackPanel>
+                    </StackPanel>
+                    <Button Grid.Column="2" Click="OnRunClick" VerticalAlignment="Center" ToolTip.Tip="Skript auf diesem Gerät ausführen">
+                      <controls:IconLabel Icon="{StaticResource Icon.Play}" Text="Ausführen" />
+                    </Button>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+        <StackPanel x:Name="EmptyState" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="420">
+          <controls:IconView Data="{StaticResource Icon.Terminal}" Width="44" Height="44" Foreground="{DynamicResource TextFaintBrush}" HorizontalAlignment="Center" />
+          <TextBlock x:Name="EmptyText" TextAlignment="Center" TextWrapping="Wrap" Theme="{StaticResource MutedText}" FontSize="14" />
+        </StackPanel>
+      </Panel>
+    </DockPanel>
+  </Border>
+</UserControl>

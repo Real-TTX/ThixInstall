@@ -1,0 +1,31 @@
+# Build output
+**/bin/
+**/obj/
+publish/
+artifacts/
+TestResults/
+*.log
+
+# IDE / OS
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+Thumbs.db
+.DS_Store
+
+# Node (browser checks)
+node_modules/
+
+# Secrets
+*.pfx
+*.pem
+*.key
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/worktrees/
+
+# Screenshots of the browser checks (curated ones live in docs/images)
+tests/e2e/shots/

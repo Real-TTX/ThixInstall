@@ -1,0 +1,132 @@
+@page "/"
+@model ThixInstall.Cloud.Pages.IndexModel
+@{
+    // The one special view of the app (MatDesign: an app may have a view of its own where the app needs it, built from the toolkit): the catalog
+    // as tiles to tick, like Ninite. Signed in it stands in the shell; visitors see it without a menu.
+    Layout = Model.SignedIn ? "_Layout" : "_LayoutPublic";
+    ViewData["Title"] = "Paket zusammenstellen";
+    ViewData["PageSub"] = "Apps und Skripte ankreuzen, Paket erstellen, herunterladen und starten – ThixInstall installiert alles ohne Rückfragen.";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Verwaltung", null), ("Paket zusammenstellen", null) };
+    ViewData["Indexable"] = !Model.SignedIn;
+    ViewData["Width"] = "wide";
+    var osKey = ApiContract.ToQuery(Model.Os);
+    var count = Model.PackageGroups.Sum(g => g.Items.Count);
+}
+
+@if (!Model.SignedIn)
+{
+    <section class="ti-hero">
+        <h1 class="ti-hero__title">Alle Programme auf einmal installieren.</h1>
+        <p class="ti-hero__text">Kreuze an, was auf den Rechner soll, und lade <strong>ein</strong> Programm herunter. ThixInstall installiert alles still im Hintergrund –
+            die neuesten Versionen, ohne Werbung, ohne „Weiter“-Klicken. Für Windows und macOS.</p>
+    </section>
+}
+
+<form class="ti-picker" method="post" data-selectable novalidate>
+    @if (Model.Error is not null)
+    {
+        <div class="mat-alert mat-alert--danger" role="alert">
+            @Ui.Icon("x-circle")
+            <div class="mat-alert__body">@Model.Error</div>
+        </div>
+    }
+
+    <div class="ti-picker__tools">
+        <div class="mat-seg" role="group" aria-label="Betriebssystem">
+            <a class="mat-seg__btn" href="/?os=windows" aria-pressed="@(Model.Os == TargetOs.Windows ? "true" : "false")">@Ui.Icon("windows")<span>Windows</span></a>
+            <a class="mat-seg__btn" href="/?os=macos" aria-pressed="@(Model.Os == TargetOs.MacOS ? "true" : "false")">@Ui.Icon("apple")<span>macOS</span></a>
+        </div>
+        <div class="mat-input-icon ti-picker__search">
+            @Ui.Icon("search")
+            <input class="mat-input" type="search" id="picker-search" placeholder="Apps und Skripte durchsuchen" aria-label="Apps und Skripte durchsuchen" autocomplete="off" data-shortcut="/" data-tile-filter="#picker-items" />
+        </div>
+        <span class="mat-toolbar__info" aria-live="polite">@count Apps · @Model.Scripts.Count Skripte</span>
+    </div>
+
+    <div class="ti-picker__items" id="picker-items">
+        @if (count == 0 && Model.Scripts.Count == 0)
+        {
+            <div class="mat-empty">
+                <span class="mat-empty__icon">@Ui.Icon("box")</span>
+                <div class="mat-empty__title">Noch nichts im Katalog</div>
+                <p>Für @Ui.OsName(Model.Os) gibt es noch keine Apps. Die Administration pflegt den Katalog.</p>
+            </div>
+        }
+
+        @foreach (var group in Model.PackageGroups)
+        {
+            <section class="ti-cat" data-tile-group>
+                <h2 class="ti-cat__title">@group.Category</h2>
+                <div class="ti-tiles">
+                    @foreach (var p in group.Items)
+                    {
+                        <label class="mat-tile ti-tile @(p.IsFeatured ? "ti-tile--featured" : "")" data-tile-text="@($"{p.Name} {p.Note} {p.Category} {p.Description}")">
+                            <input class="ti-tile__check" type="checkbox" name="PackageIds" value="@p.Id" data-select-row checked="@Model.PackageIds.Contains(p.Id)" aria-label="@p.Name" />
+                            @Ui.AppIcon(p.Id, p.Key, p.Name, p.HasIcon)
+                            <span class="ti-tile__text">
+                                <span class="ti-tile__name">@p.Name</span>
+                                <span class="ti-tile__meta">@(p.Version is null ? p.Note : $"Version {p.Version}")</span>
+                            </span>
+                        </label>
+                    }
+                </div>
+            </section>
+        }
+
+        @if (Model.Scripts.Count > 0)
+        {
+            <section class="ti-cat" data-tile-group>
+                <h2 class="ti-cat__title">Skripte und Einstellungen</h2>
+                <div class="ti-tiles">
+                    @foreach (var s in Model.Scripts)
+                    {
+                        <label class="mat-tile ti-tile ti-tile--script" data-tile-text="@($"{s.Name} {s.Description} {s.Category}")">
+                            <input class="ti-tile__check" type="checkbox" name="ScriptIds" value="@s.Id" data-select-row checked="@Model.ScriptIds.Contains(s.Id)" aria-label="@s.Name" />
+                            <span class="ti-appicon ti-appicon--md ti-appicon--script" aria-hidden="true">@Ui.Icon("terminal")</span>
+                            <span class="ti-tile__text">
+                                <span class="ti-tile__name">@s.Name</span>
+                                <span class="ti-tile__meta">@s.Description</span>
+                            </span>
+                        </label>
+                    }
+                </div>
+            </section>
+        }
+
+        <p class="mat-muted ti-picker__nothing" data-tile-empty hidden>Nichts gefunden.</p>
+    </div>
+
+    @if (Model.SignedIn)
+    {
+        <div class="mat-card ti-options">
+            <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("settings")Optionen</h2></div>
+            <div class="mat-card__body mat-form">
+                <ti-field name="Name" label="Name des Pakets" optional value="@Model.Name" maxlength="120" placeholder="z. B. Büro-PC" hint="Steht auf der Seite des Pakets und im Dateinamen." />
+                <ti-field name="IncludesAgent" kind="switch" label="ThixInstall mitinstallieren (Updates, Aufträge aus der Cloud)" value="@Model.IncludesAgent.ToString()" />
+                <ti-field name="ProfileId" kind="select" label="Profil" value="@Model.ProfileId" options="Model.Profiles" show-if="#IncludesAgent"
+                          hint="Das Gerät bekommt dieses Profil, sobald ThixInstall angemeldet ist." />
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="mat-alert mat-alert--info ti-options" role="note">
+            @Ui.Icon("info")
+            <div class="mat-alert__body">
+                <strong>Mit Konto geht mehr:</strong> ThixInstall mitinstallieren, Updates aller Apps im Blick behalten und Aufträge aus der Cloud an die eigenen Rechner schicken.
+                <a href="/Account/Login">Anmelden</a>
+            </div>
+        </div>
+    }
+
+    <div class="mat-bulk ti-summary" data-bulk-bar hidden>
+        <span class="mat-bulk__count"><span data-bulk-count>0</span> ausgewählt</span>
+        <button type="submit" class="mat-btn mat-btn--primary">@Ui.Icon("download")<span>Paket erstellen</span></button>
+    </div>
+    @if (Model.SignedIn)
+    {
+        <div class="mat-actions ti-picker__agent-only" data-agent-only>
+            <button type="submit" class="mat-btn mat-btn--secondary" formaction="/?os=@osKey&amp;handler=AgentOnly" formnovalidate>@Ui.Icon("download")<span>Nur ThixInstall herunterladen</span></button>
+        </div>
+    }
+</form>

@@ -1,0 +1,43 @@
+@page "/About"
+@{
+    ViewData["Title"] = "Über ThixInstall";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Über ThixInstall", null) };
+    ViewData["Width"] = "narrow";
+    var channel = AppInfo.Channel switch { "release" => "Release", "nightly" => "Nightly (Entwicklung)", _ => "Lokaler Build" };
+}
+
+<div class="mat-card">
+    <div class="mat-card__body ti-about">
+        <div class="ti-about__head">
+            @Ui.Logo("lg")
+            <div>
+                <h2>ThixInstall.Cloud</h2>
+                <p>Apps und Skripte für Windows und macOS mit einem Klick installieren – und die Rechner danach im Blick behalten.</p>
+            </div>
+        </div>
+        <dl class="ti-facts">
+            <dt>@Ui.Icon("tag")Version</dt><dd class="mat-mono">@AppInfo.Version</dd>
+            <dt>@Ui.Icon("git")Kanal</dt><dd>@channel</dd>
+            <dt>@Ui.Icon("network")API-Protokoll</dt><dd class="mat-mono">v@(ApiContract.ProtocolVersion)</dd>
+        </dl>
+    </div>
+</div>
+
+<div class="mat-card">
+    <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("box")So funktioniert es</h2></div>
+    <div class="mat-card__body">
+        <ul class="ti-list">
+            <li><strong>Paket zusammenstellen:</strong> auf der Startseite Apps und Skripte ankreuzen, ein Programm herunterladen, starten – fertig. Das geht auch ohne Konto.</li>
+            <li><strong>Quellen:</strong> winget, Chocolatey und Homebrew liefern die Pakete; die Cloud löst die neuesten Versionen auf und hält die Installer in ihrem Download-Cache.</li>
+            <li><strong>ThixInstall mitinstallieren:</strong> mit Konto meldet sich der Rechner an, zeigt Updates, installiert aus dem Katalog und nimmt mit „Sync“ Aufträge aus der Cloud an.</li>
+            <li><strong>Profile:</strong> Apps und Skripte für Gruppen von Rechnern, mit Registrierungsschlüssel für das automatische Einrichten.</li>
+        </ul>
+        <p><a href="https://github.com/Real-TTX/ThixInstall/releases" target="_blank" rel="noopener">@Ui.Icon("external") Desktop-App, Downloads und Versionen auf GitHub</a></p>
+    </div>
+</div>
+
+<div class="mat-card">
+    <div class="mat-card__body">
+        <p class="mat-muted">© Matthias Schmoldt. Oberfläche: MatUi (MatDesign). Datenbank: PostgreSQL. Paketquellen: winget-pkgs, Homebrew, Chocolatey.</p>
+    </div>
+</div>

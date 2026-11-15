@@ -1,0 +1,31 @@
+@page "/Account/Security"
+@model ThixInstall.Cloud.Pages.Account.SecurityModel
+@{
+    ViewData["Title"] = "Konto";
+    ViewData["PageSub"] = "Passwort ändern";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Konto", "/Account"), ("Sicherheit", null) };
+    ViewData["Width"] = "narrow";
+}
+
+<partial name="_AccountTabs" model="@("security")" />
+
+@if (Model.MustChange)
+{
+    <div class="mat-alert mat-alert--warning" role="status">
+        @Ui.Icon("alert")
+        <div class="mat-alert__body">Dein Passwort wurde von der Administration gesetzt. Bitte wähle jetzt ein eigenes.</div>
+    </div>
+}
+
+<form class="mat-form" method="post" novalidate>
+    <partial name="_FormSummary" model="ViewData.ModelState" />
+    <div class="mat-card">
+        <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("lock")Passwort ändern</h2></div>
+        <div class="mat-card__body mat-form">
+            <ti-field name="Current" kind="password" label="Aktuelles Passwort" required autocomplete="current-password" msg-required="Bitte das aktuelle Passwort eingeben." />
+            <ti-field name="New" kind="password" label="Neues Passwort" required autocomplete="new-password" minlength="@Passwords.MinLength" hint="Mindestens @Passwords.MinLength Zeichen." msg-required="Bitte ein neues Passwort eingeben." />
+            <ti-field name="Repeat" kind="password" label="Neues Passwort wiederholen" required autocomplete="new-password" msg-required="Bitte das neue Passwort wiederholen." />
+        </div>
+    </div>
+    <ti-buttons save="Passwort ändern" save-icon="lock" back="@(Model.MustChange ? null : "/Account")" />
+</form>

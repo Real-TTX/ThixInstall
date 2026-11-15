@@ -1,0 +1,34 @@
+@page "/Account/Login"
+@model ThixInstall.Cloud.Pages.Account.LoginModel
+@{
+    Layout = "_LayoutAuth";
+    ViewData["Title"] = "Anmelden";
+}
+
+<div class="mat-auth__card">
+    <div class="mat-auth__brand">
+        @Ui.Logo("lg")
+        <h1>ThixInstall.Cloud</h1>
+        <p class="mat-muted">Apps installieren, Updates im Blick, Geräte verwalten. Mit deinem Konto anmelden.</p>
+    </div>
+
+    @if (Model.SignedOut)
+    {
+        <div class="mat-alert mat-alert--info" role="status">
+            @Ui.Icon("info")
+            <div class="mat-alert__body">Du bist abgemeldet.</div>
+        </div>
+    }
+
+    <form class="mat-form" method="post" novalidate id="login-form">
+        <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+        <partial name="_FormSummary" model="ViewData.ModelState" />
+        <ti-field name="UserName" label="Benutzername" required autocomplete="username" value="@Model.UserName" autofocus msg-required="Bitte den Benutzernamen eingeben." />
+        <ti-field name="Password" kind="password" label="Passwort" required autocomplete="current-password" msg-required="Bitte das Passwort eingeben." />
+        <ti-field name="Remember" kind="check" label="Angemeldet bleiben" value="@Model.Remember.ToString()" />
+        <div class="mat-btn-row mat-btn-row--plain">
+            <button type="submit" class="mat-btn mat-btn--primary mat-btn--block">@Ui.Icon("login")<span>Anmelden</span></button>
+        </div>
+        <p class="mat-muted ti-center">Kein Konto? Die Administration legt Konten an.</p>
+    </form>
+</div>

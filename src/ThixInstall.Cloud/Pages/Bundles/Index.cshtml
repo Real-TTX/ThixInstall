@@ -1,0 +1,60 @@
+@page "/Bundles"
+@model ThixInstall.Cloud.Pages.Bundles.IndexModel
+@{
+    ViewData["Title"] = "Pakete";
+    ViewData["PageSub"] = "Zusammengestellte Pakete: ein Programm, das alle gewählten Apps und Skripte installiert.";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Verwaltung", null), ("Pakete", null) };
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="Model.Toolbar" />
+
+    @if (Model.Items.Count == 0)
+    {
+        var first = Model.Toolbar.Total == 0;
+        <partial name="_Empty" model="@(new EmptyStateModel("download", first ? "Noch kein Paket" : "Nichts gefunden",
+            first ? "Auf der Startseite Apps und Skripte ankreuzen und „Paket erstellen“ wählen." : "Kein Paket passt zur Suche oder zu den Filtern.",
+            first, "/", "Paket zusammenstellen", Model.Toolbar.UrlReset()))" />
+    }
+    else
+    {
+        <ti-table caption="Pakete">
+            <thead>
+                <tr>
+                    <th scope="col">Paket</th>
+                    <th scope="col">System</th>
+                    @if (Model.ShowOwner) { <th scope="col" class="mat-hide-md">Von</th> }
+                    <th scope="col" class="mat-num">Einträge</th>
+                    <th scope="col" class="mat-hide-sm">ThixInstall</th>
+                    <th scope="col" class="mat-num mat-hide-sm">Downloads</th>
+                    <th scope="col" class="mat-hide-md">Angelegt</th>
+                    <th scope="col"><span class="mat-sr-only">Aktionen</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var b in Model.Items)
+                {
+                    <tr>
+                        <td data-label="Paket" class="mat-table__primary"><div class="mat-table__name">@Ui.Icon("download")<a href="/Bundles/Detail?id=@b.Id">@b.Name</a></div></td>
+                        <td data-label="System"><span class="ti-inline">@Ui.Icon(Ui.OsIcon(b.Os))@Ui.OsName(b.Os)</span></td>
+                        @if (Model.ShowOwner) { <td data-label="Von" class="mat-hide-md">@(b.OwnerName ?? "Ohne Konto")</td> }
+                        <td data-label="Einträge" class="mat-num mat-mono">@b.Items</td>
+                        <td data-label="ThixInstall" class="mat-hide-sm">@(b.IncludesAgent ? (b.ProfileName is null ? "Ja" : $"Ja, Profil {b.ProfileName}") : "–")</td>
+                        <td data-label="Downloads" class="mat-num mat-mono mat-hide-sm">@b.DownloadCount</td>
+                        <td data-label="Angelegt" class="mat-hide-md">@Dates.Stamp(b.CreateDate)</td>
+                        <td class="mat-table__cell-actions"><div class="mat-table__actions">
+                            <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="@ApiContract.BundlePage(b.Token)" aria-label="Download-Seite von @b.Name" data-tip="Download-Seite">@Ui.Icon("external")</a>
+                            <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Bundles/Detail?id=@b.Id" aria-label="@b.Name öffnen" data-tip="Öffnen">@Ui.Icon("chevron-right")</a>
+                        </div></td>
+                    </tr>
+                }
+            </tbody>
+        </ti-table>
+    }
+
+    <partial name="_Pager" model="Model.Pager" />
+
+    <div class="mat-actions">
+        <a class="mat-btn mat-btn--primary" href="/">@Ui.Icon("plus")<span>Paket zusammenstellen</span></a>
+    </div>
+</div>

@@ -1,0 +1,57 @@
+@page "/Admin/Cache"
+@model ThixInstall.Cloud.Pages.Admin.Cache.IndexModel
+@{
+    ViewData["Title"] = "Download-Cache";
+    ViewData["PageSub"] = "Jeder Installer wird einmal von seiner Quelle geladen, geprüft und danach von hier ausgeliefert.";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Administration", null), ("Download-Cache", null) };
+    var percent = Model.Summary.MaxBytes == 0 ? 0 : (int)Math.Min(100, Model.Summary.Bytes * 100 / Model.Summary.MaxBytes);
+}
+
+<div class="mat-stats">
+    <div class="mat-stat"><span class="mat-stat__label">Dateien</span><span class="mat-stat__value">@Model.Summary.Files</span><span class="mat-stat__icon">@Ui.Icon("file")</span></div>
+    <div class="mat-stat"><span class="mat-stat__label">Belegt</span><span class="mat-stat__value">@Ui.Bytes(Model.Summary.Bytes)</span><span class="mat-stat__icon">@Ui.Icon("hard-drive")</span></div>
+    <a class="mat-stat" href="/Admin/Settings"><span class="mat-stat__label">Höchstens</span><span class="mat-stat__value">@Ui.Bytes(Model.Summary.MaxBytes)</span><span class="mat-stat__icon">@Ui.Icon("settings")</span></a>
+</div>
+<div class="mat-meter" role="meter" aria-label="Belegung des Caches" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@percent" data-value="@percent"><div class="mat-meter__fill"></div></div>
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="Model.Toolbar" />
+
+    @if (Model.Items.Count == 0)
+    {
+        var first = Model.Toolbar.Total == 0;
+        <partial name="_Empty" model="@(new EmptyStateModel("hard-drive", first ? "Der Cache ist leer" : "Nichts gefunden",
+            first ? "Sobald ein Gerät einen Installer abruft, liegt er hier." : "Keine Datei passt zur Suche.", false, null, null, Model.Toolbar.UrlReset()))" />
+    }
+    else
+    {
+        <form method="post">
+            <ti-table caption="Dateien im Cache">
+                <thead><tr><th scope="col">Datei</th><th scope="col" class="mat-num">Größe</th><th scope="col" class="mat-num mat-hide-sm">Abrufe</th><th scope="col">Zuletzt benutzt</th><th scope="col" class="mat-hide-md">Geladen</th><th scope="col"><span class="mat-sr-only">Aktionen</span></th></tr></thead>
+                <tbody>
+                    @foreach (var f in Model.Items)
+                    {
+                        <tr>
+                            <td data-label="Datei" class="mat-table__primary"><div class="mat-table__name">@Ui.Icon("file")<span>@f.FileName<small class="mat-muted mat-mono ti-break">@f.SourceUrl</small></span></div></td>
+                            <td data-label="Größe" class="mat-num mat-mono">@Ui.Bytes(f.Size)</td>
+                            <td data-label="Abrufe" class="mat-num mat-mono mat-hide-sm">@f.UseCount</td>
+                            <td data-label="Zuletzt benutzt" class="mat-table__keep-label">@Dates.Ago(f.LastUsedDate)</td>
+                            <td data-label="Geladen" class="mat-hide-md">@Dates.Stamp(f.CreateDate)</td>
+                            <td class="mat-table__cell-actions"><div class="mat-table__actions">
+                                <button type="submit" class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" asp-page-handler="Delete" asp-route-id="@f.Id" data-confirm="@($"{f.FileName} aus dem Cache entfernen?")" data-confirm-ok="Entfernen" data-confirm-danger aria-label="@f.FileName entfernen" data-tip="Entfernen">@Ui.Icon("trash")</button>
+                            </div></td>
+                        </tr>
+                    }
+                </tbody>
+            </ti-table>
+        </form>
+    }
+
+    <partial name="_Pager" model="Model.Pager" />
+
+    <form method="post" class="mat-actions">
+        <a class="mat-btn mat-btn--secondary" href="/Admin/Settings">@Ui.Icon("settings")<span>Größe einstellen</span></a>
+        <span class="mat-btn-row__spacer"></span>
+        <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Clear" data-confirm="Den ganzen Cache leeren? Jeder Installer wird beim nächsten Abruf neu geladen." data-confirm-ok="Leeren" data-confirm-danger disabled="@(Model.Summary.Files == 0)">@Ui.Icon("trash")<span>Cache leeren</span></button>
+    </form>
+</div>

@@ -1,0 +1,61 @@
+@page "/Catalog/Scripts/Edit"
+@model ThixInstall.Cloud.Pages.Catalog.Scripts.EditModel
+@{
+    var title = Model.IsNew ? "Neues Skript" : Model.Name;
+    ViewData["Title"] = title;
+    ViewData["PageSub"] = Model.IsNew ? "Name, System und Kategorie; das Skript selbst kommt danach." : $"Skript für {Ui.OsName(Model.SavedOs)} · Schlüssel {Model.Key}";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Katalog", null), ("Skripte", "/Catalog/Scripts"), (Model.IsNew ? "Neu" : Model.Name, null) };
+    ViewData["Width"] = Model.Tab == "script" ? null : "narrow";
+    var url = $"/Catalog/Scripts/Edit?id={Model.Id}";
+    var deleteConfirm = $"{Model.Name} löschen? Profile und Pakete bieten es danach nicht mehr an.";
+}
+
+@if (!Model.IsNew)
+{
+    <ti-tabs label="Skript">
+        <ti-tab href="@url" active="@(Model.Tab == "general")" icon="info">Allgemein</ti-tab>
+        <ti-tab href="@(url + "&tab=script")" active="@(Model.Tab == "script")" icon="code">Skript</ti-tab>
+    </ti-tabs>
+}
+
+@if (Model.Tab == "script")
+{
+    <form class="mat-form" method="post" asp-page-handler="Script" asp-route-id="@Model.Id" asp-route-tab="script" novalidate>
+        <partial name="_FormSummary" model="ViewData.ModelState" />
+        <div class="mat-card">
+            <div class="mat-card__body mat-form">
+                <ti-field name="Shell" kind="radios" label="Shell" value="@Model.Shell" options="Model.Shells" />
+                <ti-field name="Context" kind="radios" label="Ausführen als" value="@Model.Context" options="EditModel.Contexts" />
+                <ti-field name="Content" kind="textarea" label="Skript" required value="@Model.ScriptText" rows="18" mono msg-required="Bitte das Skript eingeben."
+                          hint="Ein Exit-Code ungleich 0 zählt als Fehler; die Ausgabe erscheint beim Auftrag." />
+                <ti-field name="TimeoutSeconds" kind="number" label="Zeitgrenze in Sekunden" value="@Model.TimeoutSeconds" hint="0 = 30 Minuten. Danach wird das Skript beendet." />
+            </div>
+        </div>
+        <ti-buttons save="Speichern" back="/Catalog/Scripts" delete-handler="Delete" delete-confirm="@deleteConfirm" />
+    </form>
+}
+else
+{
+    <form class="mat-form" method="post" asp-route-id="@Model.Id" novalidate>
+        <partial name="_FormSummary" model="ViewData.ModelState" />
+        <div class="mat-card">
+            <div class="mat-card__body mat-form">
+                <ti-field name="Name" label="Name" required value="@Model.Name" maxlength="120" msg-required="Bitte einen Namen eingeben." autofocus="@Model.IsNew" />
+                @if (Model.IsNew)
+                {
+                    <ti-field name="Os" kind="radios" label="System" value="@Model.Os" options="EditModel.Systems" hint="Lässt sich später nicht ändern." />
+                }
+                else
+                {
+                    <input type="hidden" name="Os" value="@Model.Os" />
+                }
+                <ti-field name="Key" label="Schlüssel" optional value="@Model.Key" mono maxlength="64" placeholder="wird aus dem Namen gebildet" />
+                <ti-field name="Category" label="Kategorie" required value="@Model.Category" maxlength="60" suggest="Model.Categories" msg-required="Bitte eine Kategorie angeben." />
+                <ti-field name="Description" kind="textarea" label="Beschreibung" optional value="@Model.Description" maxlength="1000" rows="3" hint="Was das Skript tut – steht auf der Startseite." />
+                <ti-field name="IsPublic" kind="switch" label="Öffentlich: auch Besucher ohne Konto sehen das Skript" value="@Model.IsPublic.ToString()" />
+                <ti-field name="SortOrder" kind="number" label="Reihenfolge" value="@Model.SortOrder" />
+            </div>
+        </div>
+        <ti-buttons save="@(Model.IsNew ? "Anlegen" : "Speichern")" save-icon="@(Model.IsNew ? "plus" : "save")" back="/Catalog/Scripts" delete-handler="@(Model.IsNew ? null : "Delete")" delete-confirm="@deleteConfirm" />
+    </form>
+}

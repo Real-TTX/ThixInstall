@@ -1,0 +1,174 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ThixInstall.Controls"
+             x:Class="ThixInstall.Pages.SettingsPage">
+  <!-- Settings in tabs: Allgemein | Cloud | Updates | Erweitert. A switch applies at once (like macOS). -->
+  <Border Background="{DynamicResource SurfaceBrush}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="28,22,28,28" MaxWidth="820" HorizontalAlignment="Left">
+        <TextBlock Text="Einstellungen" Theme="{StaticResource PageTitle}" />
+        <TextBlock x:Name="PolicyNote" Theme="{StaticResource MutedText}" Margin="0,4,0,0" IsVisible="False"
+                   Text="Einige Einstellungen wurden von einem Administrator festgelegt." />
+        <controls:InfoBar x:Name="PageMessage" Margin="0,14,0,0" />
+
+        <TabControl x:Name="Tabs" Margin="0,12,0,0">
+          <!-- ===== General ===== -->
+          <TabItem x:Name="GeneralTabItem" Header="Allgemein">
+            <StackPanel>
+              <controls:SettingRow Title="Bei der Anmeldung starten" Description="ThixInstall startet unsichtbar im Infobereich / in der Menüleiste.">
+                <ToggleSwitch x:Name="AutostartSwitch" OnContent="" OffContent="" AutomationProperties.Name="Bei der Anmeldung starten" />
+              </controls:SettingRow>
+              <controls:SettingRow Title="Mitteilungen" Description="Eine Meldung, wenn ein Auftrag aus der Cloud fertig ist oder etwas fehlschlägt.">
+                <ToggleSwitch x:Name="NotificationsSwitch" OnContent="" OffContent="" AutomationProperties.Name="Mitteilungen" />
+              </controls:SettingRow>
+              <controls:SettingRow Title="Erscheinungsbild" BorderThickness="0">
+                <ComboBox x:Name="ThemeChoice" MinWidth="170" AutomationProperties.Name="Erscheinungsbild">
+                  <ComboBoxItem Content="Wie das System" />
+                  <ComboBoxItem Content="Hell" />
+                  <ComboBoxItem Content="Dunkel" />
+                </ComboBox>
+              </controls:SettingRow>
+            </StackPanel>
+          </TabItem>
+
+          <!-- ===== Cloud ===== -->
+          <TabItem x:Name="CloudTabItem" Header="Cloud">
+            <StackPanel>
+              <!-- Connected -->
+              <StackPanel x:Name="ConnectedPanel" IsVisible="False">
+                <Border Theme="{StaticResource Card}" Padding="20,16" Margin="0,0,0,16">
+                  <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                    <TextBlock Text="Cloud" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+                    <SelectableTextBlock Grid.Column="1" x:Name="ServerText" Margin="0,3" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Text="Konto" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="AccountText" Margin="0,3" />
+                    <TextBlock Grid.Row="2" Text="Gerät" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="DeviceText" Margin="0,3" />
+                    <TextBlock Grid.Row="3" Text="Profil" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ProfileText" Margin="0,3" />
+                    <TextBlock Grid.Row="4" Text="Status" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+                    <TextBlock Grid.Row="4" Grid.Column="1" x:Name="StateText" Margin="0,3" TextWrapping="Wrap" />
+                  </Grid>
+                </Border>
+                <controls:SettingRow Title="Sync" BorderThickness="0"
+                                     Description="An: das Gerät meldet seine installierten Apps und führt Aufträge aus, die in der Cloud gesendet werden (Installieren, Aktualisieren, Skripte, Profile). Aus: nur der Katalog.">
+                  <ToggleSwitch x:Name="SyncSwitch" OnContent="" OffContent="" AutomationProperties.Name="Sync" />
+                </controls:SettingRow>
+                <controls:ActionBar Margin="0,14,0,0">
+                  <Button Click="OnOpenCloudClick">
+                    <controls:IconLabel Icon="{StaticResource Icon.External}" Text="Cloud im Browser öffnen" />
+                  </Button>
+                  <Button x:Name="DisconnectButton" Theme="{StaticResource DangerButton}" Click="OnDisconnectClick" controls:ActionBar.Separated="True">
+                    <controls:IconLabel Icon="{StaticResource Icon.Logout}" Text="Verbindung trennen" />
+                  </Button>
+                </controls:ActionBar>
+              </StackPanel>
+
+              <!-- Not connected -->
+              <StackPanel x:Name="ConnectPanel">
+                <TextBlock TextWrapping="Wrap" LineHeight="21" Margin="0,0,0,16"
+                           Text="Verbinde ThixInstall mit deiner ThixInstall.Cloud: dann installierst du Apps aus ihrem Katalog, siehst Updates und – mit Sync – kann die Cloud Aufträge an dieses Gerät senden." />
+                <TabControl x:Name="ConnectModeTabs" Padding="0,16,0,0">
+                  <TabItem Header="Mit Konto">
+                    <StackPanel>
+                      <controls:FormField Label="Adresse der Cloud" Field="ServerUrl" Hint="z. B. https://install.example.com">
+                        <TextBox x:Name="ServerBox" Watermark="https://" />
+                      </controls:FormField>
+                      <controls:FormField Label="Benutzername" Field="UserName">
+                        <TextBox x:Name="UserBox" />
+                      </controls:FormField>
+                      <controls:FormField Label="Passwort" Field="Password" Hint="Nur für die Anmeldung: das Gerät bekommt ein eigenes Token.">
+                        <TextBox x:Name="PasswordBox" PasswordChar="•" />
+                      </controls:FormField>
+                    </StackPanel>
+                  </TabItem>
+                  <TabItem Header="Mit Registrierungsschlüssel">
+                    <StackPanel>
+                      <controls:FormField Label="Adresse der Cloud" Field="ServerUrl">
+                        <TextBox x:Name="KeyServerBox" Watermark="https://" />
+                      </controls:FormField>
+                      <controls:FormField Label="Registrierungsschlüssel" Field="EnrollmentKey"
+                                          Hint="Aus dem Profil in der Cloud (Profile › Registrierung). Das Gerät bekommt dieses Profil.">
+                        <TextBox x:Name="KeyBox" />
+                      </controls:FormField>
+                    </StackPanel>
+                  </TabItem>
+                </TabControl>
+                <controls:FormField Label="Gerätename" Field="DeviceName">
+                  <TextBox x:Name="DeviceNameBox" />
+                </controls:FormField>
+                <controls:SettingRow Title="Sync einschalten" Description="Die Cloud darf Aufträge an dieses Gerät senden." BorderThickness="0">
+                  <ToggleSwitch x:Name="ConnectSyncSwitch" IsChecked="True" OnContent="" OffContent="" AutomationProperties.Name="Sync einschalten" />
+                </controls:SettingRow>
+                <controls:ActionBar Margin="0,10,0,0">
+                  <Button x:Name="ConnectButton" Theme="{StaticResource PrimaryButton}" Click="OnConnectClick" IsDefault="True">
+                    <controls:IconLabel x:Name="ConnectLabel" Icon="{StaticResource Icon.Login}" Text="Verbinden" />
+                  </Button>
+                </controls:ActionBar>
+              </StackPanel>
+            </StackPanel>
+          </TabItem>
+
+          <!-- ===== Updates ===== -->
+          <TabItem x:Name="UpdatesTabItem" Header="Updates">
+            <StackPanel>
+              <Border Theme="{StaticResource SubtleCard}" Margin="0,0,0,8">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                  <controls:IconView Data="{StaticResource Icon.Download}" Width="20" Height="20" Margin="0,0,12,0" Foreground="{DynamicResource AccentBrush}" />
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock x:Name="SelfUpdateTitle" FontWeight="SemiBold" />
+                    <TextBlock x:Name="SelfUpdateText" Theme="{StaticResource MutedText}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <Button x:Name="CheckUpdateButton" Click="OnCheckUpdateClick">
+                      <controls:IconLabel Icon="{StaticResource Icon.Sync}" Text="Jetzt prüfen" />
+                    </Button>
+                    <Button x:Name="InstallUpdateButton" Theme="{StaticResource PrimaryButton}" Click="OnInstallUpdateClick" IsVisible="False">
+                      <controls:IconLabel Icon="{StaticResource Icon.Download}" Text="Update installieren" />
+                    </Button>
+                  </StackPanel>
+                </Grid>
+              </Border>
+              <controls:SettingRow Title="Nach Updates von ThixInstall suchen" Description="Beim Start und alle 6 Stunden, im eigenen Kanal (Release oder Nightly).">
+                <ToggleSwitch x:Name="CheckUpdatesSwitch" OnContent="" OffContent="" AutomationProperties.Name="Nach Updates suchen" />
+              </controls:SettingRow>
+              <controls:SettingRow Title="Updates von ThixInstall automatisch installieren" Description="Full-Auto-Update: ohne Rückfrage, ThixInstall startet danach neu.">
+                <ToggleSwitch x:Name="AutoInstallSwitch" OnContent="" OffContent="" AutomationProperties.Name="Updates automatisch installieren" />
+              </controls:SettingRow>
+              <controls:SettingRow Title="Apps automatisch aktualisieren" BorderThickness="0"
+                                   Description="Einmal am Tag installiert ThixInstall neuere Versionen der Apps aus dem Katalog.">
+                <ToggleSwitch x:Name="AutoAppsSwitch" OnContent="" OffContent="" AutomationProperties.Name="Apps automatisch aktualisieren" />
+              </controls:SettingRow>
+            </StackPanel>
+          </TabItem>
+
+          <!-- ===== Advanced ===== -->
+          <TabItem x:Name="AdvancedTabItem" Header="Erweitert">
+            <StackPanel>
+              <Border Theme="{StaticResource Card}" Padding="20,16" Margin="0,0,0,16">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                  <TextBlock Text="Agent" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+                  <TextBlock Grid.Column="1" x:Name="AgentText" Margin="0,3" TextWrapping="Wrap" />
+                  <TextBlock Grid.Row="1" Text="Rechte" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+                  <TextBlock Grid.Row="1" Grid.Column="1" x:Name="RightsText" Margin="0,3" TextWrapping="Wrap" />
+                  <TextBlock Grid.Row="2" Text="Paketmanager" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+                  <TextBlock Grid.Row="2" Grid.Column="1" x:Name="ManagersText" Margin="0,3" TextWrapping="Wrap" />
+                  <TextBlock Grid.Row="3" Text="Richtlinien" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+                  <TextBlock Grid.Row="3" Grid.Column="1" x:Name="PoliciesText" Margin="0,3" TextWrapping="Wrap" />
+                </Grid>
+              </Border>
+              <controls:ActionBar>
+                <Button Click="OnLogsClick">
+                  <controls:IconLabel Icon="{StaticResource Icon.Folder}" Text="Protokolle öffnen" />
+                </Button>
+                <Button Click="OnDataClick">
+                  <controls:IconLabel Icon="{StaticResource Icon.Folder}" Text="Datenordner öffnen" />
+                </Button>
+              </controls:ActionBar>
+            </StackPanel>
+          </TabItem>
+        </TabControl>
+      </StackPanel>
+    </ScrollViewer>
+  </Border>
+</UserControl>

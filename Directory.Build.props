@@ -1,0 +1,63 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <Company>Matthias Schmoldt</Company>
+    <Product>ThixInstall</Product>
+    <Authors>Matthias Schmoldt</Authors>
+    <Copyright>© Matthias Schmoldt</Copyright>
+    <SatelliteResourceLanguages>de;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!--
+    The desktop projects (ThixInstall.Core, ThixInstall, ThixInstall.Tests) build against this framework; the code for one
+    platform is guarded by OperatingSystem.IsWindows()/IsMacOS(). The cloud (Linux container) and the contract use net10.0 too.
+  -->
+  <PropertyGroup>
+    <DesktopTargetFramework>net10.0</DesktopTargetFramework>
+  </PropertyGroup>
+
+  <!--
+    Versioning (single source of truth: Major/Minor below). CI sets Channel / BuildNumber / BuildDate:
+      release : <major>.<minor>.<build>-<date>   e.g. 0.1.42-20261114   (branch main)
+      nightly : nightly-<build>-<date>          e.g. nightly-43-20261114 (branch dev)
+      local   : local-<date>                    e.g. local-20261114      (every local build)
+    The build number is the GitHub run number and increases with every build; the update check compares it.
+  -->
+  <PropertyGroup>
+    <ThixInstallMajor>0</ThixInstallMajor>
+    <ThixInstallMinor>1</ThixInstallMinor>
+
+    <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    <Channel Condition="'$(Channel)' == ''">local</Channel>
+    <BuildDate Condition="'$(BuildDate)' == ''">$([System.DateTime]::UtcNow.ToString('yyyyMMdd'))</BuildDate>
+
+    <Version>$(ThixInstallMajor).$(ThixInstallMinor).$(BuildNumber)</Version>
+    <AssemblyVersion>$(ThixInstallMajor).$(ThixInstallMinor).0.0</AssemblyVersion>
+    <FileVersion>$(ThixInstallMajor).$(ThixInstallMinor).$(BuildNumber).0</FileVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Channel)' == 'release'">
+    <InformationalVersion>$(ThixInstallMajor).$(ThixInstallMinor).$(BuildNumber)-$(BuildDate)</InformationalVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Channel)' == 'nightly'">
+    <InformationalVersion>nightly-$(BuildNumber)-$(BuildDate)</InformationalVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Channel)' == 'local'">
+    <InformationalVersion>local-$(BuildDate)</InformationalVersion>
+  </PropertyGroup>
+
+  <!-- The running program needs channel and build number (update check, about page). -->
+  <ItemGroup>
+    <AssemblyMetadata Include="ThixInstallChannel" Value="$(Channel)" />
+    <AssemblyMetadata Include="ThixInstallBuildNumber" Value="$(BuildNumber)" />
+    <AssemblyMetadata Include="ThixInstallRepository" Value="Real-TTX/ThixInstall" />
+  </ItemGroup>
+
+</Project>

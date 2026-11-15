@@ -1,0 +1,44 @@
+@page "/Profiles"
+@model ThixInstall.Cloud.Pages.Profiles.IndexModel
+@{
+    ViewData["Title"] = "Profile";
+    ViewData["PageSub"] = "Apps und Skripte für Gruppen von Rechnern – mit Registrierungsschlüssel für das automatische Einrichten.";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Katalog", null), ("Profile", null) };
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="Model.Toolbar" />
+
+    @if (Model.Items.Count == 0)
+    {
+        var first = Model.Toolbar.Total == 0;
+        <partial name="_Empty" model="@(new EmptyStateModel("template", first ? "Noch kein Profil" : "Nichts gefunden",
+            first ? "Ein Profil fasst Apps und Skripte zusammen, z. B. „Büro“ oder „Entwicklung“. Neue Rechner bekommen es automatisch über den Registrierungsschlüssel." : "Kein Profil passt zur Suche.",
+            first, "/Profiles/Edit", "Neues Profil", Model.Toolbar.UrlReset()))" />
+    }
+    else
+    {
+        <ti-table caption="Profile">
+            <thead><tr><th scope="col">Profil</th><th scope="col" class="mat-num">Apps</th><th scope="col" class="mat-num">Skripte</th><th scope="col" class="mat-num">Geräte</th><th scope="col" class="mat-hide-md">Geändert</th><th scope="col"><span class="mat-sr-only">Aktionen</span></th></tr></thead>
+            <tbody>
+                @foreach (var p in Model.Items)
+                {
+                    <tr>
+                        <td data-label="Profil" class="mat-table__primary"><div class="mat-table__name">@Ui.Icon("template")<span><a href="/Profiles/Edit?id=@p.Id">@p.Name</a>@if (p.Description is not null) { <small class="mat-muted">@p.Description</small> }</span></div></td>
+                        <td data-label="Apps" class="mat-num mat-mono">@p.Apps</td>
+                        <td data-label="Skripte" class="mat-num mat-mono">@p.Scripts</td>
+                        <td data-label="Geräte" class="mat-num mat-mono">@p.Devices</td>
+                        <td data-label="Geändert" class="mat-hide-md">@Dates.Stamp(p.UpdateDate)</td>
+                        <td class="mat-table__cell-actions"><div class="mat-table__actions"><a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Profiles/Edit?id=@p.Id" aria-label="@p.Name bearbeiten" data-tip="Bearbeiten">@Ui.Icon("edit")</a></div></td>
+                    </tr>
+                }
+            </tbody>
+        </ti-table>
+    }
+
+    <partial name="_Pager" model="Model.Pager" />
+
+    <div class="mat-actions">
+        <a class="mat-btn mat-btn--primary" href="/Profiles/Edit">@Ui.Icon("plus")<span>Neues Profil</span></a>
+    </div>
+</div>

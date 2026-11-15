@@ -1,0 +1,31 @@
+@page "/Account"
+@model ThixInstall.Cloud.Pages.Account.IndexModel
+@{
+    ViewData["Title"] = "Konto";
+    ViewData["PageSub"] = $"Angemeldet als {Model.Account.UserName}";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Konto", null), ("Allgemein", null) };
+    ViewData["Width"] = "narrow";
+}
+
+<partial name="_AccountTabs" model="@("general")" />
+
+<form class="mat-form" method="post" novalidate>
+    <partial name="_FormSummary" model="ViewData.ModelState" />
+    <div class="mat-card">
+        <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("user")Profil</h2></div>
+        <div class="mat-card__body mat-form">
+            <div class="mat-field">
+                <span class="mat-label">Benutzername</span>
+                <span class="mat-mono">@Model.Account.UserName</span>
+                <span class="mat-hint">Damit meldest du dich im Browser und in der ThixInstall-App an.</span>
+            </div>
+            <ti-field name="DisplayName" label="Anzeigename" required value="@Model.DisplayName" maxlength="120" autocomplete="name" msg-required="Bitte einen Namen eingeben." />
+            <ti-field name="Email" kind="email" label="E-Mail-Adresse" optional value="@Model.Email" maxlength="200" autocomplete="email" />
+            <div class="mat-field">
+                <span class="mat-label">Rolle</span>
+                <span>@(Model.Account.IsAdmin ? "Administrator: pflegt Katalog, Profile, Benutzer und Einstellungen" : "Benutzer: verwaltet die eigenen Geräte")</span>
+            </div>
+        </div>
+    </div>
+    <ti-buttons save="Speichern" back="/Devices" />
+</form>

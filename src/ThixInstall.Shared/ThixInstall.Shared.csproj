@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The contract between the desktop app (ThixInstall.Core) and the cloud (ThixInstall.Cloud): routes, request and
+    response types, limits, the bundle ticket and the version comparison both sides use. No dependencies. A change here
+    is a change of the protocol: keep it backwards compatible (new optional fields only) or raise ApiContract.ProtocolVersion.
+  -->
+  <PropertyGroup>
+    <RootNamespace>ThixInstall.Shared</RootNamespace>
+  </PropertyGroup>
+
+</Project>

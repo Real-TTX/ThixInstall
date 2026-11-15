@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!--
+    ThixInstall app icon, full detail (48 px and larger): an arrow drops into an open box, on a teal tile.
+    Geometry on a 256 grid; tools/render-icons.js renders the PNG, ICO and ICNS files from it.
+  -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#36C7A8"/>
+      <stop offset="1" stop-color="#0B7566"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E3F6F1"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#tile)"/>
+  <!-- the open lid: the inside of the box behind the arrow -->
+  <path d="M66 140 L88 112 H168 L190 140 Z" fill="#FFFFFF" fill-opacity="0.42" stroke="#FFFFFF" stroke-opacity="0.42" stroke-width="8" stroke-linejoin="round"/>
+  <!-- the arrow -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="128" y1="44" x2="128" y2="126"/>
+    <polyline points="94,94 128,128 162,94"/>
+  </g>
+  <!-- the front of the box with a label -->
+  <rect x="58" y="136" width="140" height="80" rx="18" fill="url(#front)"/>
+  <line x1="102" y1="170" x2="154" y2="170" stroke="#13917C" stroke-width="12" stroke-linecap="round"/>
+</svg>

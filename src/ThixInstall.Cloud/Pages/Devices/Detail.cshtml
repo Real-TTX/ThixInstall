@@ -1,0 +1,132 @@
+@page "/Devices/Detail"
+@model ThixInstall.Cloud.Pages.Devices.DetailModel
+@{
+    var d = Model.Device;
+    ViewData["Title"] = d.Name;
+    ViewData["PageSub"] = $"{Ui.OsName(d.Os)} {d.OsVersion} · {DeviceService.ArchitectureName(d.Architecture)} · zuletzt gesehen {Dates.Ago(d.LastSeenDate)}";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Verwaltung", null), ("Geräte", "/Devices"), (d.Name, null) };
+    var url = $"/Devices/Detail?id={d.Id}";
+}
+
+<ti-tabs label="Gerät">
+    <ti-tab href="@url" active="@(Model.Tab == "overview")" icon="dashboard">Übersicht</ti-tab>
+    <ti-tab href="@(url + "&tab=software")" active="@(Model.Tab == "software")" icon="box">Software</ti-tab>
+    <ti-tab href="@(url + "&tab=actions")" active="@(Model.Tab == "actions")" icon="list-checks">Aufträge</ti-tab>
+    <ti-tab href="@(url + "&tab=settings")" active="@(Model.Tab == "settings")" icon="settings">Einstellungen</ti-tab>
+</ti-tabs>
+
+@if (!d.SyncEnabled)
+{
+    <div class="mat-alert mat-alert--warning" role="status">
+        @Ui.Icon("alert")
+        <div class="mat-alert__body">Sync ist auf diesem Gerät ausgeschaltet: es meldet kein Inventar und nimmt keine Aufträge an. Einschalten in ThixInstall auf dem Rechner (Einstellungen › Cloud).</div>
+    </div>
+}
+
+@switch (Model.Tab)
+{
+    case "software":
+        <div class="mat-list">
+            <partial name="_Toolbar" model="Model.Toolbar" />
+            @if (Model.Apps.Count == 0)
+            {
+                <partial name="_Empty" model="@(new EmptyStateModel("box", Model.AppsTotal == 0 ? "Noch kein Inventar" : "Nichts gefunden",
+                    Model.AppsTotal == 0 ? "Das Gerät meldet seine Apps, sobald Sync eingeschaltet ist." : "Keine App passt zur Suche oder zum Filter.", false, null, null, Model.Toolbar!.UrlReset()))" />
+            }
+            else
+            {
+                <ti-table caption="Software">
+                    <thead><tr><th scope="col">App</th><th scope="col">Installiert</th><th scope="col">Neueste</th><th scope="col" class="mat-hide-sm">Herausgeber</th><th scope="col"><span class="mat-sr-only">Aktionen</span></th></tr></thead>
+                    <tbody>
+                        @foreach (var a in Model.Apps)
+                        {
+                            <tr>
+                                <td data-label="App" class="mat-table__primary"><div class="mat-table__name"><span>@a.Name@if (a.PackageName is not null) { <small class="mat-muted">Katalog: @a.PackageName</small> }</span></div></td>
+                                <td data-label="Installiert" class="mat-mono">@(a.Version ?? "–")</td>
+                                <td data-label="Neueste" class="mat-mono mat-table__keep-label">@if (a.UpdateAvailable) { <span class="mat-pill mat-pill--warn">@a.LatestVersion</span> } else { @(a.LatestVersion ?? "–") }</td>
+                                <td data-label="Herausgeber" class="mat-hide-sm">@(a.Publisher ?? "–")</td>
+                                <td class="mat-table__cell-actions"><div class="mat-table__actions">
+                                    @if (a.UpdateAvailable && a.PackageId is { } pid)
+                                    {
+                                        <form method="post" asp-page-handler="Update" asp-route-id="@d.Id" asp-route-packageId="@pid">
+                                            <button type="submit" class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" aria-label="@a.Name aktualisieren" data-tip="Aktualisieren">@Ui.Icon("refresh")</button>
+                                        </form>
+                                    }
+                                </div></td>
+                            </tr>
+                        }
+                    </tbody>
+                </ti-table>
+            }
+            <div class="mat-actions">
+                <form method="post" asp-page-handler="UpdateAll" asp-route-id="@d.Id">
+                    <button type="submit" class="mat-btn mat-btn--primary" disabled="@(d.Updates == 0 || !d.SyncEnabled)">@Ui.Icon("refresh")<span>Alle aktualisieren (@d.Updates)</span></button>
+                </form>
+                <a class="mat-btn mat-btn--secondary" href="/Devices/Push?id=@d.Id">@Ui.Icon("rocket")<span>Auftrag senden</span></a>
+            </div>
+            <p class="mat-hint">Stand des Inventars: @Dates.Stamp(d.InventoryDate)</p>
+        </div>
+        break;
+
+    case "actions":
+        <div class="mat-list">
+            @if (Model.Actions.Count == 0)
+            {
+                <partial name="_Empty" model="@(new EmptyStateModel("list-checks", "Noch keine Aufträge", "Hier steht, was das Gerät installiert und ausgeführt hat – aus der Cloud, über das Profil oder am Gerät selbst.", true, $"/Devices/Push?id={d.Id}", "Auftrag senden"))" />
+            }
+            else
+            {
+                <partial name="_ActionTable" model="@((Model.Actions, false))" />
+            }
+            <partial name="_Pager" model="Model.Pager" />
+            <div class="mat-actions">
+                <a class="mat-btn mat-btn--primary" href="/Devices/Push?id=@d.Id">@Ui.Icon("rocket")<span>Auftrag senden</span></a>
+            </div>
+        </div>
+        break;
+
+    case "settings":
+        <form class="mat-form" method="post" asp-route-id="@d.Id" novalidate>
+            <partial name="_FormSummary" model="ViewData.ModelState" />
+            <div class="mat-card">
+                <div class="mat-card__body mat-form">
+                    <div class="mat-field">
+                        <span class="mat-label">Name</span>
+                        <span>@d.Name</span>
+                        <span class="mat-hint">Der Name kommt vom Rechner (Computername).</span>
+                    </div>
+                    <ti-field name="ProfileId" kind="select" label="Profil" value="@Model.ProfileId" options="Model.Profiles"
+                              hint="Die Apps und Skripte des Profils gehen als Aufträge an das Gerät, sobald Sync an ist." />
+                </div>
+            </div>
+            <ti-buttons save="Speichern" back="/Devices" delete-handler="Delete" delete-label="Entfernen"
+                        delete-confirm="@($"{d.Name} entfernen? ThixInstall auf dem Rechner wird abgemeldet; offene Aufträge werden abgebrochen. Die installierten Apps bleiben.")" />
+        </form>
+        break;
+
+    default:
+        <div class="mat-stats">
+            <a class="mat-stat @(d.Updates > 0 ? "mat-stat--warning" : "")" href="@(url + "&tab=software&show=updates")"><span class="mat-stat__label">Updates</span><span class="mat-stat__value">@d.Updates</span><span class="mat-stat__icon">@Ui.Icon("refresh")</span></a>
+            <a class="mat-stat" href="@(url + "&tab=software")"><span class="mat-stat__label">Apps</span><span class="mat-stat__value">@d.Apps</span><span class="mat-stat__icon">@Ui.Icon("box")</span></a>
+            <a class="mat-stat @(d.OpenActions > 0 ? "mat-stat--info" : "")" href="@(url + "&tab=actions")"><span class="mat-stat__label">Offene Aufträge</span><span class="mat-stat__value">@d.OpenActions</span><span class="mat-stat__icon">@Ui.Icon("list-checks")</span></a>
+        </div>
+        <div class="mat-card">
+            <div class="mat-card__body">
+                <dl class="ti-facts">
+                    <dt>@Ui.Icon(Ui.OsIcon(d.Os))System</dt><dd>@Ui.OsName(d.Os) @d.OsVersion (@DeviceService.ArchitectureName(d.Architecture))</dd>
+                    <dt>@Ui.Icon("tag")ThixInstall</dt><dd class="mat-mono">@(d.AgentVersion.Length == 0 ? "–" : d.AgentVersion)</dd>
+                    <dt>@Ui.Icon("user")Besitzer</dt><dd>@d.OwnerName <span class="mat-muted mat-mono">@d.OwnerUserName</span></dd>
+                    <dt>@Ui.Icon("template")Profil</dt><dd>@(d.ProfileName ?? "–")</dd>
+                    <dt>@Ui.Icon("refresh")Sync</dt><dd>@(d.SyncEnabled ? "An: meldet Inventar, nimmt Aufträge an" : "Aus")</dd>
+                    <dt>@Ui.Icon("clock")Zuletzt gesehen</dt><dd>@Dates.Stamp(d.LastSeenDate) (@Dates.Ago(d.LastSeenDate))</dd>
+                    <dt>@Ui.Icon("calendar")Angemeldet seit</dt><dd>@Dates.Stamp(d.CreateDate)</dd>
+                    <dt>@Ui.Icon("globe")Adresse</dt><dd class="mat-mono">@(d.IpAddress ?? "–")</dd>
+                </dl>
+            </div>
+        </div>
+        <div class="mat-btn-row">
+            <a class="mat-btn mat-btn--primary" href="/Devices/Push?id=@d.Id">@Ui.Icon("rocket")<span>Auftrag senden</span></a>
+            <a class="mat-btn mat-btn--secondary" href="/Devices">@Ui.Icon("back")<span>Zurück</span></a>
+        </div>
+        break;
+}

@@ -1,0 +1,116 @@
+@page "/Admin/Settings"
+@model ThixInstall.Cloud.Pages.Admin.Settings.IndexModel
+@{
+    ViewData["Title"] = "Einstellungen";
+    ViewData["PageSub"] = "Was für die ganze Cloud gilt.";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Administration", null), ("Einstellungen", null) };
+    ViewData["Width"] = "narrow";
+}
+
+<ti-tabs label="Einstellungen">
+    <ti-tab href="/Admin/Settings" active="@(Model.Tab == "general")" icon="settings">Allgemein</ti-tab>
+    <ti-tab href="/Admin/Settings?tab=desktop" active="@(Model.Tab == "desktop")" icon="monitor">Desktop-App</ti-tab>
+    <ti-tab href="/Admin/Settings?tab=sources" active="@(Model.Tab == "sources")" icon="git">Quellen</ti-tab>
+</ti-tabs>
+
+@switch (Model.Tab)
+{
+    case "desktop":
+        <form class="mat-form" method="post" asp-page-handler="Channel" asp-route-tab="desktop" novalidate>
+            <partial name="_FormSummary" model="ViewData.ModelState" />
+            <div class="mat-card">
+                <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("git")Kanal</h2></div>
+                <div class="mat-card__body mat-form">
+                    <ti-field name="DesktopChannel" kind="radios" label="Welche ThixInstall-Version steckt in den Paketen?" value="@Model.DesktopChannel" options="IndexModel.Channels"
+                              hint="Die Pakete kommen aus dem GitHub-Release des Kanals – außer, für eine Plattform ist unten eine Datei hochgeladen." />
+                </div>
+            </div>
+            <div class="mat-btn-row"><button type="submit" class="mat-btn mat-btn--primary">@Ui.Icon("save")<span>Speichern</span></button></div>
+        </form>
+
+        <div class="mat-card">
+            <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("box")Pakete je Plattform</h2></div>
+            <form method="post" asp-route-tab="desktop">
+                <ti-table caption="Pakete je Plattform">
+                    <thead><tr><th scope="col">Plattform</th><th scope="col">Quelle</th><th scope="col"><span class="mat-sr-only">Aktionen</span></th></tr></thead>
+                    <tbody>
+                        @foreach (var s in Model.Sources)
+                        {
+                            <tr>
+                                <td data-label="Plattform" class="mat-table__primary">@s.Label</td>
+                                <td data-label="Quelle">
+                                    @if (s.HasUpload)
+                                    {
+                                        <span class="mat-pill mat-pill--accent">Hochgeladen</span> <small class="mat-muted">@Ui.Bytes(s.UploadSize), @Dates.Stamp(s.UploadDate)</small>
+                                    }
+                                    else if (s.GitHubFile is not null)
+                                    {
+                                        <span class="mat-pill mat-pill--ok">GitHub</span> <small class="mat-muted mat-mono">@s.GitHubFile @s.GitHubVersion</small>
+                                    }
+                                    else
+                                    {
+                                        <span class="mat-pill mat-pill--warn">Keine</span> <small class="mat-muted">Im Kanal gibt es noch kein Paket.</small>
+                                    }
+                                </td>
+                                <td class="mat-table__cell-actions"><div class="mat-table__actions">
+                                    @if (s.HasUpload)
+                                    {
+                                        <button type="submit" class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" asp-page-handler="RemoveUpload" asp-route-platform="@s.PlatformKey" asp-route-tab="desktop" data-confirm="Die hochgeladene Datei entfernen? Danach gilt wieder GitHub." data-confirm-ok="Entfernen" data-confirm-danger aria-label="Upload für @s.Label entfernen" data-tip="Upload entfernen">@Ui.Icon("trash")</button>
+                                    }
+                                </div></td>
+                            </tr>
+                        }
+                    </tbody>
+                </ti-table>
+            </form>
+        </div>
+
+        <form class="mat-form" method="post" asp-page-handler="Upload" asp-route-tab="desktop" enctype="multipart/form-data" novalidate>
+            <div class="mat-card">
+                <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("upload")Eigene Datei hochladen</h2></div>
+                <div class="mat-card__body mat-form">
+                    <ti-field name="Platform" kind="radios" label="Plattform" value="@("win-x64")" options="@(AgentService.Platforms.Select(p => new ThixInstall.Cloud.Controls.Choice(p.Key, p.Label)).ToList())" />
+                    <ti-field name="File" kind="file" label="Datei" required accept=".exe,.zip" max-size="400MB" msg-required="Bitte eine Datei wählen."
+                              hint="Windows: ThixInstallSetup.exe; macOS: ThixInstall-macOS-arm64.zip bzw. -x64.zip (die Zip-Datei der App). Für lokale Tests und eigene Builds." />
+                </div>
+            </div>
+            <div class="mat-btn-row"><button type="submit" class="mat-btn mat-btn--primary">@Ui.Icon("upload")<span>Hochladen</span></button></div>
+        </form>
+        break;
+
+    case "sources":
+        <form class="mat-form" method="post" asp-page-handler="Token" asp-route-tab="sources" novalidate>
+            <partial name="_FormSummary" model="ViewData.ModelState" />
+            <div class="mat-card">
+                <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("key")GitHub-Token</h2></div>
+                <div class="mat-card__body mat-form">
+                    <p>Die winget-Manifeste liegen auf GitHub. Ohne Token erlaubt GitHub 60 Anfragen pro Stunde – für einen großen Katalog zu wenig. Ein Token ohne Berechtigungen (nur öffentliche Repositories) hebt die Grenze auf 5.000.</p>
+                    <ti-field name="GitHubToken" kind="password" label="@(Model.HasGitHubToken ? "Neues Token" : "Token")" optional autocomplete="off" maxlength="200"
+                              hint="@(Model.HasGitHubToken ? "Ein Token ist hinterlegt. Leer lassen, um es zu behalten." : "Wird nur für Anfragen an api.github.com verwendet.")" />
+                </div>
+            </div>
+            <div class="mat-btn-row">
+                <button type="submit" class="mat-btn mat-btn--primary">@Ui.Icon("save")<span>Speichern</span></button>
+                @if (Model.HasGitHubToken)
+                {
+                    <span class="mat-btn-row__spacer"></span>
+                    <button type="submit" class="mat-btn mat-btn--danger" formaction="/Admin/Settings?tab=sources&amp;handler=Token&amp;remove=true" formnovalidate data-confirm="Das GitHub-Token entfernen?" data-confirm-ok="Entfernen" data-confirm-danger>@Ui.Icon("trash")<span>Token entfernen</span></button>
+                }
+            </div>
+        </form>
+        break;
+
+    default:
+        <form class="mat-form" method="post" novalidate>
+            <partial name="_FormSummary" model="ViewData.ModelState" />
+            <div class="mat-card">
+                <div class="mat-card__body mat-form">
+                    <ti-field name="PublicCatalog" kind="switch" label="Startseite öffentlich: Besucher ohne Konto stellen Pakete aus den öffentlichen Apps zusammen" value="@Model.PublicCatalog.ToString()" />
+                    <ti-field name="CacheMaxGigabytes" kind="number" label="Größe des Download-Caches in GB" value="@Model.CacheMaxGigabytes" required
+                              hint="Darüber gehen die Dateien, die am längsten nicht gebraucht wurden." />
+                </div>
+            </div>
+            <ti-buttons save="Speichern" />
+        </form>
+        break;
+}

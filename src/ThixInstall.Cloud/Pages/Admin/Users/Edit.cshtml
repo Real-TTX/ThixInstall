@@ -1,0 +1,35 @@
+@page "/Admin/Users/Edit"
+@model ThixInstall.Cloud.Pages.Admin.Users.EditModel
+@{
+    var title = Model.IsNew ? "Neuer Benutzer" : Model.DisplayName;
+    ViewData["Title"] = title;
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Administration", null), ("Benutzer", "/Admin/Users"), (Model.IsNew ? "Neu" : Model.DisplayName, null) };
+    ViewData["Width"] = "narrow";
+}
+
+<form class="mat-form" method="post" novalidate>
+    <partial name="_FormSummary" model="ViewData.ModelState" />
+    <div class="mat-card">
+        <div class="mat-card__body mat-form">
+            <ti-field name="UserName" label="Benutzername" required value="@Model.UserName" maxlength="64" autocomplete="off"
+                      hint="Zum Anmelden im Browser und in der App: a–z, Ziffern und . _ - @@" msg-required="Bitte einen Benutzernamen eingeben." />
+            <ti-field name="DisplayName" label="Anzeigename" optional value="@Model.DisplayName" maxlength="120" />
+            @if (!Model.IsSelf)
+            {
+                <ti-field name="Role" kind="radios" label="Rolle" value="@Model.Role" options="EditModel.Roles" />
+                <ti-field name="IsActive" kind="switch" label="Darf sich anmelden" value="@Model.IsActive.ToString()" />
+            }
+            <ti-field name="Password" kind="password" label="@(Model.IsNew ? "Passwort" : "Neues Passwort")" required="@Model.IsNew" optional="@(!Model.IsNew)" autocomplete="new-password" minlength="@Passwords.MinLength"
+                      hint="@(Model.IsNew ? $"Mindestens {Passwords.MinLength} Zeichen. Bei der ersten Anmeldung wählt die Person ein eigenes." : "Leer lassen, um es nicht zu ändern. Ein neues Passwort meldet die Browser ab; die Person wählt danach ein eigenes.")"
+                      msg-required="Bitte ein Passwort vergeben." />
+            @if (Model.IsSelf)
+            {
+                <input type="hidden" name="Role" value="admin" />
+                <input type="hidden" name="IsActive" value="true" />
+                <p class="mat-hint">Das ist dein eigenes Konto: Es bleibt Administrator und aktiv.</p>
+            }
+        </div>
+    </div>
+    <ti-buttons save="@(Model.IsNew ? "Anlegen" : "Speichern")" save-icon="@(Model.IsNew ? "plus" : "save")" back="/Admin/Users" delete-handler="@(Model.IsNew || Model.IsSelf ? null : "Delete")"
+                delete-confirm="@($"{Model.DisplayName} löschen? Die Pakete dieses Kontos werden gelöscht, seine Geräte abgemeldet.")" />
+</form>

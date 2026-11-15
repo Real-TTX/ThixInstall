@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The desktop app without UI: the agent (jobs, inventory, the connection to ThixInstall.Cloud), the installer engines
+    (cached downloads, winget, Chocolatey, Homebrew, MSI/EXE/MSIX, DMG/PKG/ZIP, scripts), setup, self update, autostart and
+    the native parts for Windows and macOS. Windows-only code is guarded by OperatingSystem.IsWindows() or
+    [SupportedOSPlatform("windows")].
+  -->
+  <PropertyGroup>
+    <TargetFramework>$(DesktopTargetFramework)</TargetFramework>
+    <RootNamespace>ThixInstall.Core</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ThixInstall.Tests" />
+    <InternalsVisibleTo Include="ThixInstall" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.15" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.15" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ThixInstall.Shared\ThixInstall.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

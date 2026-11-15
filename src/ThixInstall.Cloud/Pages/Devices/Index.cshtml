@@ -1,0 +1,62 @@
+@page "/Devices"
+@model ThixInstall.Cloud.Pages.Devices.IndexModel
+@{
+    ViewData["Title"] = "Geräte";
+    ViewData["PageSub"] = "Die Rechner mit ThixInstall. Mit „Sync“ melden sie ihre Apps und nehmen Aufträge aus der Cloud an.";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Verwaltung", null), ("Geräte", null) };
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="Model.Toolbar" />
+
+    @if (Model.Items.Count == 0)
+    {
+        var first = Model.Toolbar.Total == 0;
+        <partial name="_Empty" model="@(new EmptyStateModel("monitor", first ? "Noch kein Gerät" : "Nichts gefunden",
+            first ? "Stell ein Paket zusammen und schalte „ThixInstall mitinstallieren“ ein – der Rechner erscheint hier, sobald das Paket gelaufen ist." : "Kein Gerät passt zur Suche oder zu den Filtern.",
+            first, "/", "Paket zusammenstellen", Model.Toolbar.UrlReset()))" />
+    }
+    else
+    {
+        <ti-table caption="Geräte">
+            <thead>
+                <tr>
+                    <th scope="col">Gerät</th>
+                    <th scope="col">System</th>
+                    @if (Model.ShowOwner) { <th scope="col" class="mat-hide-md">Besitzer</th> }
+                    <th scope="col" class="mat-hide-sm">Profil</th>
+                    <th scope="col">Sync</th>
+                    <th scope="col" class="mat-num">Updates</th>
+                    <th scope="col" class="mat-num mat-hide-sm">Offen</th>
+                    <th scope="col">Zuletzt gesehen</th>
+                    <th scope="col"><span class="mat-sr-only">Aktionen</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var d in Model.Items)
+                {
+                    <tr>
+                        <td data-label="Gerät" class="mat-table__primary"><div class="mat-table__name">@Ui.Icon(Ui.OsIcon(d.Os))<span><a href="/Devices/Detail?id=@d.Id">@d.Name</a><small class="mat-muted">@(d.AgentVersion.Length == 0 ? "" : "ThixInstall " + d.AgentVersion)</small></span></div></td>
+                        <td data-label="System">@Ui.OsName(d.Os) <span class="mat-muted">@DeviceService.ArchitectureName(d.Architecture)</span></td>
+                        @if (Model.ShowOwner) { <td data-label="Besitzer" class="mat-hide-md">@d.OwnerName</td> }
+                        <td data-label="Profil" class="mat-hide-sm">@(d.ProfileName ?? "–")</td>
+                        <td data-label="Sync">@if (d.SyncEnabled) { <span class="mat-pill mat-pill--ok">An</span> } else { <span class="mat-pill mat-pill--plain">Aus</span> }</td>
+                        <td data-label="Updates" class="mat-num mat-table__keep-label">@if (d.Updates > 0) { <span class="mat-pill mat-pill--warn">@d.Updates</span> } else { <span class="mat-muted">0</span> }</td>
+                        <td data-label="Offen" class="mat-num mat-mono mat-hide-sm">@d.OpenActions</td>
+                        <td data-label="Zuletzt gesehen" class="mat-table__keep-label">@Dates.Ago(d.LastSeenDate)</td>
+                        <td class="mat-table__cell-actions"><div class="mat-table__actions">
+                            <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Devices/Push?id=@d.Id" aria-label="Auftrag an @d.Name senden" data-tip="Auftrag senden">@Ui.Icon("rocket")</a>
+                            <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Devices/Detail?id=@d.Id" aria-label="@d.Name öffnen" data-tip="Öffnen">@Ui.Icon("chevron-right")</a>
+                        </div></td>
+                    </tr>
+                }
+            </tbody>
+        </ti-table>
+    }
+
+    <partial name="_Pager" model="Model.Pager" />
+
+    <div class="mat-actions">
+        <a class="mat-btn mat-btn--primary" href="/">@Ui.Icon("plus")<span>Gerät hinzufügen (Paket mit ThixInstall)</span></a>
+    </div>
+</div>

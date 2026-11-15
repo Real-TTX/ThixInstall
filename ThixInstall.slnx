@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ThixInstall.Shared/ThixInstall.Shared.csproj" />
+    <Project Path="src/ThixInstall.Core/ThixInstall.Core.csproj" />
+    <Project Path="src/ThixInstall/ThixInstall.csproj" />
+    <Project Path="src/ThixInstall.Cloud/ThixInstall.Cloud.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ThixInstall.Tests/ThixInstall.Tests.csproj" />
+    <Project Path="tests/ThixInstall.Cloud.Tests/ThixInstall.Cloud.Tests.csproj" />
+  </Folder>
+</Solution>

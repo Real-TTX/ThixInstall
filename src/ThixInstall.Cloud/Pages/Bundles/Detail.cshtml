@@ -1,0 +1,48 @@
+@page "/Bundles/Detail"
+@model ThixInstall.Cloud.Pages.Bundles.DetailModel
+@{
+    var b = Model.Bundle;
+    ViewData["Title"] = b.Name;
+    ViewData["PageSub"] = $"Paket für {Ui.OsName(b.Os)} · angelegt {Dates.Stamp(b.CreateDate)}{(b.OwnerName is null ? " ohne Konto" : " von " + b.OwnerName)}";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Verwaltung", null), ("Pakete", "/Bundles"), (b.Name, null) };
+    ViewData["Width"] = "narrow";
+}
+
+<form method="post" novalidate>
+    <div class="mat-card">
+        <div class="mat-card__body">
+            <dl class="ti-facts">
+                <dt>@Ui.Icon(Ui.OsIcon(b.Os))System</dt><dd>@Ui.OsName(b.Os)</dd>
+                <dt>@Ui.Icon("box")Inhalt</dt><dd>@b.Packages.Count Apps, @b.Scripts.Count Skripte</dd>
+                <dt>@Ui.Icon("monitor")ThixInstall</dt><dd>@(b.IncludesAgent ? (b.CanEnroll ? "Wird mitinstalliert und meldet das Gerät an" : "Wird mitinstalliert; meldet keine Geräte mehr an (älter als 30 Tage)") : "Nein")</dd>
+                <dt>@Ui.Icon("template")Profil</dt><dd>@(b.ProfileName ?? "–")</dd>
+                <dt>@Ui.Icon("download")Downloads</dt><dd>@b.DownloadCount@(b.LastDownloadDate is { } last ? $" (zuletzt {Dates.Stamp(last)})" : "")</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="mat-card">
+        <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("list")Inhalt</h2></div>
+        <ul class="mat-itemlist">
+            @foreach (var p in b.Packages)
+            {
+                <li class="mat-item"><div class="mat-item__main"><span class="mat-item__lead">@Ui.AppIcon(p.Id, p.Key, p.Name, p.HasIcon, "sm")</span><span class="mat-item__body"><span class="mat-item__title">@p.Name</span><span class="mat-item__text">@p.Category</span></span></div></li>
+            }
+            @foreach (var s in b.Scripts)
+            {
+                <li class="mat-item"><div class="mat-item__main"><span class="mat-item__lead"><span class="ti-appicon ti-appicon--sm ti-appicon--script" aria-hidden="true">@Ui.Icon("terminal")</span></span><span class="mat-item__body"><span class="mat-item__title">@s.Name</span><span class="mat-item__text">Skript · @s.Category</span></span></div></li>
+            }
+            @if (b.Packages.Count + b.Scripts.Count == 0)
+            {
+                <li class="mat-item"><div class="mat-item__main"><span class="mat-item__body"><span class="mat-item__title">Nur ThixInstall</span><span class="mat-item__text">Die Apps kommen über das Profil.</span></span></div></li>
+            }
+        </ul>
+    </div>
+
+    <div class="mat-btn-row">
+        <a class="mat-btn mat-btn--primary" href="@ApiContract.BundlePage(b.Token)">@Ui.Icon("download")<span>Download-Seite</span></a>
+        <a class="mat-btn mat-btn--secondary" href="/Bundles">@Ui.Icon("back")<span>Zurück</span></a>
+        <span class="mat-btn-row__spacer"></span>
+        <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Delete" asp-route-id="@b.Id" formnovalidate data-confirm="Dieses Paket löschen? Sein Link funktioniert danach nicht mehr." data-confirm-ok="Löschen" data-confirm-danger>@Ui.Icon("trash")<span>Löschen</span></button>
+    </div>
+</form>

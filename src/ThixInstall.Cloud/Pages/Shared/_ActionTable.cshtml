@@ -1,0 +1,29 @@
+@model (IReadOnlyList<ActionListItem> Items, bool ShowDevice)
+@* The table of actions: on the page "Aufträge" with the device, on the tab of a device without it. One code base for both. *@
+<ti-table caption="Aufträge">
+    <thead>
+        <tr>
+            <th scope="col">Auftrag</th>
+            @if (Model.ShowDevice) { <th scope="col">Gerät</th> }
+            <th scope="col">Status</th>
+            <th scope="col" class="mat-hide-sm">Herkunft</th>
+            <th scope="col" class="mat-hide-md">Angelegt</th>
+            <th scope="col" class="mat-hide-md">Fertig</th>
+            <th scope="col"><span class="mat-sr-only">Aktionen</span></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var a in Model.Items)
+        {
+            <tr>
+                <td data-label="Auftrag" class="mat-table__primary"><div class="mat-table__name"><span><a href="/Actions/Detail?id=@a.Id">@a.Title</a>@if (a.RequestedBy is not null) { <small class="mat-muted">von @a.RequestedBy</small> }</span></div></td>
+                @if (Model.ShowDevice) { <td data-label="Gerät"><span class="ti-inline">@Ui.Icon(Ui.OsIcon(a.Os))<a href="/Devices/Detail?id=@a.DeviceId">@a.DeviceName</a></span></td> }
+                <td data-label="Status" class="mat-table__keep-label"><span class="mat-pill @ActionService.StatePill(a.State)">@ActionService.StateName(a.State)</span>@if (a.ExitCode is { } code && a.State == ActionState.Failed) { <small class="mat-muted mat-mono"> (@code)</small> }</td>
+                <td data-label="Herkunft" class="mat-hide-sm">@ActionService.OriginName(a.Origin)</td>
+                <td data-label="Angelegt" class="mat-hide-md">@Dates.Short(a.CreateDate)</td>
+                <td data-label="Fertig" class="mat-hide-md">@(a.FinishedDate is { } f ? Dates.Short(f) : "–")</td>
+                <td class="mat-table__cell-actions"><div class="mat-table__actions"><a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Actions/Detail?id=@a.Id" aria-label="@a.Title öffnen" data-tip="Öffnen">@Ui.Icon("chevron-right")</a></div></td>
+            </tr>
+        }
+    </tbody>
+</ti-table>

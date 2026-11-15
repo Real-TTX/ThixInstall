@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 256 256">
+  <!--
+    ThixInstall tray / menu bar glyph (16-22 px): one colour, no tile. On macOS it is a template image (black + alpha;
+    the menu bar colours it), on Windows the app uses the small icon instead. A running job adds a dot (app side).
+  -->
+  <g fill="none" stroke="#000000" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="128" y1="30" x2="128" y2="140"/>
+    <polyline points="78,92 128,142 178,92"/>
+    <path d="M36 164 V192 A28 28 0 0 0 64 220 H192 A28 28 0 0 0 220 192 V164"/>
+  </g>
+</svg>

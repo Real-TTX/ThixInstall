@@ -1,0 +1,172 @@
+name: cloud
+
+# Builds, tests and publishes the Docker image of ThixInstall.Cloud (the server) for every branch.
+#   main  -> release : <major>.<minor>.<run number>-<date>   tags <version>, latest, release
+#   dev   -> nightly : nightly-<run number>-<date>          tags <version>, nightly
+#   other -> local   : local-<date>                          (pull requests, feature branches: build only)
+# The desktop app has its own workflow; this one only runs when something of the server changed.
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'src/ThixInstall.Cloud/**'
+      - 'src/ThixInstall.Shared/**'
+      - 'tests/ThixInstall.Cloud.Tests/**'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'Directory.Build.props'
+      - 'global.json'
+      - '.github/workflows/cloud.yml'
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'src/ThixInstall.Cloud/**'
+      - 'src/ThixInstall.Shared/**'
+      - 'tests/ThixInstall.Cloud.Tests/**'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'Directory.Build.props'
+      - 'global.json'
+      - '.github/workflows/cloud.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+# One run per branch at a time: two quick pushes must not push the same image tags at once (queued, not cancelled).
+concurrency:
+  group: cloud-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/thixinstall
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # The tests of the business layer and the API run against a real PostgreSQL (THIXINSTALL_TEST_DB).
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: thixinstall
+          POSTGRES_PASSWORD: thixinstall
+          POSTGRES_DB: thixinstall
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U thixinstall -d thixinstall"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # main -> release (<major>.<minor>.<run number>-<date>), dev -> nightly (nightly-<run number>-<date>), everything else -> local.
+      - name: Determine version metadata
+        id: ver
+        shell: bash
+        run: |
+          case "${GITHUB_REF_NAME}" in
+            main) channel=release ;;
+            dev)  channel=nightly ;;
+            *)    channel=local ;;
+          esac
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then channel=local; fi
+          {
+            echo "channel=$channel"
+            echo "date=$(date -u +%Y%m%d)"
+            echo "build=${GITHUB_RUN_NUMBER}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: |
+          dotnet restore src/ThixInstall.Cloud/ThixInstall.Cloud.csproj
+          dotnet restore tests/ThixInstall.Cloud.Tests/ThixInstall.Cloud.Tests.csproj
+
+      - name: Build
+        run: >
+          dotnet build tests/ThixInstall.Cloud.Tests/ThixInstall.Cloud.Tests.csproj -c Release --no-restore
+          -p:Channel=${{ steps.ver.outputs.channel }}
+          -p:BuildNumber=${{ steps.ver.outputs.build }}
+          -p:BuildDate=${{ steps.ver.outputs.date }}
+
+      - name: Test
+        env:
+          THIXINSTALL_TEST_DB: Host=localhost;Port=5432;Database=postgres;Username=thixinstall;Password=thixinstall
+        # The GitHubActions logger shows every failed test as an annotation of the run (and in the summary of a pull request).
+        run: dotnet test tests/ThixInstall.Cloud.Tests/ThixInstall.Cloud.Tests.csproj -c Release --no-build --verbosity normal --logger GitHubActions
+
+      - name: Resolve version string
+        id: appver
+        shell: bash
+        run: |
+          v=$(dotnet msbuild src/ThixInstall.Cloud/ThixInstall.Cloud.csproj -getProperty:InformationalVersion \
+                -p:Channel=${{ steps.ver.outputs.channel }} \
+                -p:BuildNumber=${{ steps.ver.outputs.build }} \
+                -p:BuildDate=${{ steps.ver.outputs.date }})
+          v=$(echo "$v" | tr -d '[:space:]')
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          printf '### ThixInstall.Cloud\n\n- version: `%s`\n- channel: `%s`\n' "$v" "${{ steps.ver.outputs.channel }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up QEMU (arm64)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Lowercase image name
+        id: img
+        shell: bash
+        run: echo "name=$(echo "${IMAGE_NAME}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # release: <version>, latest, release   |   nightly: <version>, nightly   |   local (pull requests): build only
+      - name: Image tags
+        id: tags
+        shell: bash
+        run: |
+          image="${{ steps.img.outputs.name }}"
+          version="${{ steps.appver.outputs.version }}"
+          case "${{ steps.ver.outputs.channel }}" in
+            release) tags="$image:$version"$'\n'"$image:latest"$'\n'"$image:release" ;;
+            nightly) tags="$image:$version"$'\n'"$image:nightly" ;;
+            *)       tags="$image:$version" ;;
+          esac
+          {
+            echo "tags<<EOF"
+            echo "$tags"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && steps.ver.outputs.channel != 'local') }}
+          build-args: |
+            Channel=${{ steps.ver.outputs.channel }}
+            BuildNumber=${{ steps.ver.outputs.build }}
+            BuildDate=${{ steps.ver.outputs.date }}
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

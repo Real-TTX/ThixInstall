@@ -1,0 +1,58 @@
+@page "/Catalog/Packages"
+@model ThixInstall.Cloud.Pages.Catalog.Packages.IndexModel
+@{
+    ViewData["Title"] = "Apps";
+    ViewData["PageSub"] = "Der Katalog: woher jede App kommt (winget, Chocolatey, Homebrew, direkter Download) und welche Version die Cloud kennt.";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Katalog", null), ("Apps", null) };
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="Model.Toolbar" />
+
+    @if (Model.Items.Count == 0)
+    {
+        var first = Model.Toolbar.Total == 0;
+        <partial name="_Empty" model="@(new EmptyStateModel("box", first ? "Noch keine App" : "Nichts gefunden",
+            first ? "Lege die erste App an: Name, Kategorie und die Quelle für Windows und macOS." : "Keine App passt zur Suche oder zu den Filtern.",
+            first, "/Catalog/Packages/Edit", "Neue App", Model.Toolbar.UrlReset()))" />
+    }
+    else
+    {
+        <ti-table caption="Apps">
+            <thead>
+                <tr>
+                    <th scope="col">App</th>
+                    <th scope="col" class="mat-hide-sm">Kategorie</th>
+                    <th scope="col">Windows</th>
+                    <th scope="col">macOS</th>
+                    <th scope="col" class="mat-hide-md">Sichtbar</th>
+                    <th scope="col"><span class="mat-sr-only">Aktionen</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model.Items)
+                {
+                    <tr>
+                        <td data-label="App" class="mat-table__primary"><div class="mat-table__name">@Ui.AppIcon(p.Id, p.Key, p.Name, p.HasIcon, "sm")<span><a href="/Catalog/Packages/Edit?id=@p.Id">@p.Name</a><small class="mat-muted">@(p.Publisher ?? p.Key)</small></span></div></td>
+                        <td data-label="Kategorie" class="mat-hide-sm">@p.Category</td>
+                        <td data-label="Windows">@if (p.WindowsMethod is null) { <span class="mat-muted">–</span> } else { <span>@ReleaseService.MethodName(p.WindowsMethod)</span><small class="mat-muted mat-mono"> @p.WindowsVersion</small> }</td>
+                        <td data-label="macOS">@if (p.MacMethod is null) { <span class="mat-muted">–</span> } else { <span>@ReleaseService.MethodName(p.MacMethod)</span><small class="mat-muted mat-mono"> @p.MacVersion</small> }</td>
+                        <td data-label="Sichtbar" class="mat-hide-md">
+                            @if (p.IsPublic) { <span class="mat-pill mat-pill--ok">Öffentlich</span> } else { <span class="mat-pill mat-pill--plain">Angemeldet</span> }
+                            @if (p.IsFeatured) { <span class="mat-pill mat-pill--accent">Beliebt</span> }
+                            @if (p.HasError) { <span class="mat-pill mat-pill--error">Fehler</span> }
+                        </td>
+                        <td class="mat-table__cell-actions"><div class="mat-table__actions"><a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Catalog/Packages/Edit?id=@p.Id" aria-label="@p.Name bearbeiten" data-tip="Bearbeiten">@Ui.Icon("edit")</a></div></td>
+                    </tr>
+                }
+            </tbody>
+        </ti-table>
+    }
+
+    <partial name="_Pager" model="Model.Pager" />
+
+    <form method="post" class="mat-actions">
+        <a class="mat-btn mat-btn--primary" href="/Catalog/Packages/Edit">@Ui.Icon("plus")<span>Neue App</span></a>
+        <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="ResolveAll">@Ui.Icon("refresh")<span>Alle auflösen</span></button>
+    </form>
+</div>

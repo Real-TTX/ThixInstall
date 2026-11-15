@@ -1,0 +1,23 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ThixInstall.App"
+             Name="ThixInstall"
+             RequestedThemeVariant="Default">
+  <Application.Styles>
+    <!-- Fluent provides the templates of inputs, combo boxes, switches and scroll bars; Themes/*.axaml give them our look. -->
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Light" Accent="#0F7B6C" RegionColor="#FFFFFF" ErrorText="#DC2626" />
+        <ColorPaletteResources x:Key="Dark" Accent="#17907E" RegionColor="#202024" ErrorText="#F87171" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
+  </Application.Styles>
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://ThixInstall/Themes/Icons.axaml" />
+        <ResourceInclude Source="avares://ThixInstall/Themes/Theme.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>

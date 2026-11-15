@@ -1,0 +1,44 @@
+@inject Assets Toolkit
+@{
+    // The public pages without a menu (the start page for visitors without an account, the page of a bundle): a slim bar with the logo and the
+    // sign-in, the content in the middle. The same toolkit as everywhere; the start page is the one special view of the app (a picker like Ninite).
+    var title = ViewData["Title"] as string ?? Ui.AppName;
+}
+<!DOCTYPE html>
+<html lang="de" data-app="@Ui.AppId" data-dlg-ok="OK" data-dlg-cancel="Abbrechen" data-dlg-close="Schließen" data-dlg-confirm="Bitte bestätigen" data-dlg-notice="Hinweis" data-copied="Kopiert" data-msg-required="Bitte ausfüllen." data-msg-type="Bitte einen gültigen Wert eingeben.">
+<head>
+    <partial name="_Head" model="title" />
+</head>
+<body class="ti-public">
+    <a class="mat-skip" href="#main">Zum Inhalt springen</a>
+    @Html.Raw(Toolkit.Sprite)
+    <header class="ti-public__bar">
+        <a class="ti-brand" href="/" aria-label="ThixInstall – Startseite">
+            @Ui.Logo()
+            <span class="ti-brand__name">Thix<span>Install</span></span>
+        </a>
+        <span class="mat-toolbar__spacer"></span>
+        <button type="button" class="ti-offline" id="ti-offline" hidden>@Ui.Icon("cloud")<span data-offline-text>Offline</span></button>
+        <a class="mat-btn mat-btn--secondary" href="/Account/Login?returnUrl=@Uri.EscapeDataString(Context.Request.Path + Context.Request.QueryString)">@Ui.Icon("login")<span>Anmelden</span></a>
+    </header>
+    <main class="ti-public__main" id="main">
+        @RenderBody()
+    </main>
+    <footer class="mat-footer mat-footer--plain ti-auth-foot">
+        <p class="mat-footer__text">ThixInstall.Cloud · @AppInfo.Version</p>
+    </footer>
+    @if (TempData["Flash"] is string flash)
+    {
+        <div data-toast="@flash" data-tone="success" hidden></div>
+    }
+    @if (TempData["FlashError"] is string flashError)
+    {
+        <div data-toast="@flashError" data-tone="danger" hidden></div>
+    }
+    <script src="~/matui/matui.js" asp-append-version="true"></script>
+    <script src="~/js/offline.js" asp-append-version="true"></script>
+    <script src="~/js/pwa.js" asp-append-version="true"></script>
+    <script src="~/js/app.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

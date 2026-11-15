@@ -1,0 +1,45 @@
+@page "/Catalog/Scripts"
+@model ThixInstall.Cloud.Pages.Catalog.Scripts.IndexModel
+@{
+    ViewData["Title"] = "Skripte";
+    ViewData["PageSub"] = "Makros für Windows (PowerShell, Cmd) und macOS (Bash, Zsh): in Paketen, Profilen und als Auftrag.";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Katalog", null), ("Skripte", null) };
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="Model.Toolbar" />
+
+    @if (Model.Items.Count == 0)
+    {
+        var first = Model.Toolbar.Total == 0;
+        <partial name="_Empty" model="@(new EmptyStateModel("terminal", first ? "Noch kein Skript" : "Nichts gefunden",
+            first ? "Lege das erste Skript an, z. B. eine Einstellung, die jeder neue Rechner bekommen soll." : "Kein Skript passt zur Suche oder zu den Filtern.",
+            first, "/Catalog/Scripts/Edit", "Neues Skript", Model.Toolbar.UrlReset()))" />
+    }
+    else
+    {
+        <ti-table caption="Skripte">
+            <thead><tr><th scope="col">Skript</th><th scope="col">System</th><th scope="col" class="mat-hide-sm">Shell</th><th scope="col">Ausführen als</th><th scope="col" class="mat-hide-md">Sichtbar</th><th scope="col" class="mat-hide-md">Geändert</th><th scope="col"><span class="mat-sr-only">Aktionen</span></th></tr></thead>
+            <tbody>
+                @foreach (var s in Model.Items)
+                {
+                    <tr>
+                        <td data-label="Skript" class="mat-table__primary"><div class="mat-table__name">@Ui.Icon("terminal")<span><a href="/Catalog/Scripts/Edit?id=@s.Id">@s.Name</a><small class="mat-muted">@s.Category · @s.Lines Zeilen</small></span></div></td>
+                        <td data-label="System"><span class="ti-inline">@Ui.Icon(Ui.OsIcon(s.Os))@Ui.OsName(s.Os)</span></td>
+                        <td data-label="Shell" class="mat-hide-sm">@CatalogService.ShellName(s.Shell)</td>
+                        <td data-label="Ausführen als">@(s.Context == ScriptContext.User ? "Benutzer" : "System")</td>
+                        <td data-label="Sichtbar" class="mat-hide-md">@if (s.IsPublic) { <span class="mat-pill mat-pill--ok">Öffentlich</span> } else { <span class="mat-pill mat-pill--plain">Angemeldet</span> }</td>
+                        <td data-label="Geändert" class="mat-hide-md">@Dates.Stamp(s.UpdateDate)</td>
+                        <td class="mat-table__cell-actions"><div class="mat-table__actions"><a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Catalog/Scripts/Edit?id=@s.Id" aria-label="@s.Name bearbeiten" data-tip="Bearbeiten">@Ui.Icon("edit")</a></div></td>
+                    </tr>
+                }
+            </tbody>
+        </ti-table>
+    }
+
+    <partial name="_Pager" model="Model.Pager" />
+
+    <div class="mat-actions">
+        <a class="mat-btn mat-btn--primary" href="/Catalog/Scripts/Edit">@Ui.Icon("plus")<span>Neues Skript</span></a>
+    </div>
+</div>

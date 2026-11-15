@@ -1,0 +1,64 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ThixInstall.Controls"
+             x:Class="ThixInstall.Pages.AboutPage">
+  <!-- About ThixInstall: reached through the version number bottom left. -->
+  <Border Background="{DynamicResource SurfaceBrush}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="28,22" MaxWidth="640" HorizontalAlignment="Left" Spacing="18">
+        <TextBlock Text="Über ThixInstall" Theme="{StaticResource PageTitle}" />
+        <Border Theme="{StaticResource Card}" Padding="24">
+          <StackPanel Spacing="18">
+            <StackPanel Orientation="Horizontal" Spacing="18">
+              <Image Source="/Assets/logo-256.png" Width="88" Height="88" RenderOptions.BitmapInterpolationMode="HighQuality" />
+              <StackPanel VerticalAlignment="Center" Spacing="4">
+                <TextBlock FontSize="28" FontWeight="SemiBold">
+                  <Run Text="Thix" /><Run Text="Install" Foreground="{DynamicResource AccentBrush}" />
+                </TextBlock>
+                <TextBlock Text="Apps installieren, aktualisieren und verwalten – für Windows und macOS" Theme="{StaticResource MutedText}" />
+                <SelectableTextBlock x:Name="VersionText" FontSize="13" />
+              </StackPanel>
+            </StackPanel>
+            <!-- Updates: the state of the last check and the way to Einstellungen › Updates -->
+            <Border Theme="{StaticResource SubtleCard}">
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <controls:IconView x:Name="UpdateIcon" Data="{StaticResource Icon.Download}" Width="20" Height="20" Margin="0,0,12,0"
+                                   Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                  <TextBlock x:Name="UpdateTitle" FontWeight="SemiBold" />
+                  <TextBlock x:Name="UpdateText" Theme="{StaticResource MutedText}" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Grid.Column="2" x:Name="UpdateButton" Click="OnUpdateClick" Margin="12,0,0,0" VerticalAlignment="Center">
+                  <controls:IconLabel x:Name="UpdateLabel" Icon="{StaticResource Icon.Download}" Text="Nach Updates suchen …" />
+                </Button>
+              </Grid>
+            </Border>
+            <TextBlock TextWrapping="Wrap" LineHeight="21"
+                       Text="ThixInstall installiert Apps aus dem Katalog deiner ThixInstall.Cloud still und hält sie aktuell – mit winget, Chocolatey und Homebrew im Unterbau und den Installern aus dem Cache der Cloud. Mit Sync führt es Aufträge und Skripte aus, die du in der Cloud an dieses Gerät sendest, und Profile richten neue Geräte von selbst ein." />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+              <TextBlock Text="Kanal" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+              <TextBlock Grid.Column="1" x:Name="ChannelText" Margin="0,3" />
+              <TextBlock Grid.Row="1" Text="Build" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+              <TextBlock Grid.Row="1" Grid.Column="1" x:Name="BuildText" Margin="0,3" />
+              <TextBlock Grid.Row="2" Text="System" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+              <TextBlock Grid.Row="2" Grid.Column="1" x:Name="SystemText" Margin="0,3" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="3" Text="Daten" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+              <SelectableTextBlock Grid.Row="3" Grid.Column="1" x:Name="DataText" Margin="0,3" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="4" Text="Agent" Theme="{StaticResource MutedText}" Margin="0,3,24,3" />
+              <TextBlock Grid.Row="4" Grid.Column="1" x:Name="AgentText" Margin="0,3" TextWrapping="Wrap" />
+            </Grid>
+            <TextBlock Text="© Matthias Schmoldt. Symbole: MatDesign (Lucide, ISC-Lizenz)." Theme="{StaticResource FaintText}" TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+        <controls:ActionBar>
+          <Button Click="OnGitHubClick">
+            <controls:IconLabel Icon="{StaticResource Icon.External}" Text="Projekt auf GitHub" />
+          </Button>
+          <Button Click="OnBackClick">
+            <controls:IconLabel Icon="{StaticResource Icon.Apps}" Text="Zurück zum Katalog" />
+          </Button>
+        </controls:ActionBar>
+      </StackPanel>
+    </ScrollViewer>
+  </Border>
+</UserControl>

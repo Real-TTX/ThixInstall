@@ -1,0 +1,116 @@
+<local:ThemedWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="using:ThixInstall"
+                    xmlns:controls="using:ThixInstall.Controls"
+                    x:Class="ThixInstall.Setup.SetupWindow"
+                    Title="ThixInstall Setup" Width="600" Height="640" MinWidth="400" MinHeight="420"
+                    WindowStartupLocation="CenterScreen">
+  <!-- The Windows setup of ThixInstall:
+       Install: Welcome -> Progress -> Finish. Uninstall: Confirm -> Progress -> Finish. -->
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Background="{DynamicResource HeaderBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
+            Padding="28,18">
+      <StackPanel Orientation="Horizontal">
+        <Image Source="/Assets/logo-64.png" Width="44" Height="44" RenderOptions.BitmapInterpolationMode="HighQuality" />
+        <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontSize="26" FontWeight="SemiBold">
+          <Run Text="Thix" /><Run Text="Install" Foreground="{DynamicResource AccentBrush}" />
+        </TextBlock>
+        <TextBlock x:Name="ModeText" Margin="14,5,0,0" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource TextMutedBrush}" Text="Setup" />
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0"
+            Padding="28,12">
+      <DockPanel>
+        <controls:ActionBar DockPanel.Dock="Right">
+          <Button x:Name="PrimaryButton" Theme="{StaticResource PrimaryButton}" Click="OnPrimaryClick" IsDefault="True">
+            <controls:IconLabel x:Name="PrimaryLabel" Icon="{StaticResource Icon.Download}" Text="Installieren" />
+          </Button>
+          <Button x:Name="CancelButton" Click="OnCancelClick" IsCancel="True">
+            <controls:IconLabel Icon="{StaticResource Icon.Close}" Text="Abbrechen" />
+          </Button>
+        </controls:ActionBar>
+        <TextBlock x:Name="VersionText" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" />
+      </DockPanel>
+    </Border>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <Grid Margin="28,22,28,20">
+        <!-- Install / update -->
+        <StackPanel x:Name="WelcomePage">
+          <TextBlock x:Name="WelcomeTitle" Text="Willkommen" Theme="{StaticResource SectionTitle}" FontSize="20" Margin="0,0,0,10" />
+          <TextBlock x:Name="WelcomeText" TextWrapping="Wrap" Margin="0,0,0,16" LineHeight="21"
+                     Text="ThixInstall installiert und aktualisiert Apps aus dem Katalog deiner ThixInstall.Cloud, still und für alle Benutzer. Es läuft im Infobereich der Taskleiste, ein Dienst erledigt die Arbeit im Hintergrund." />
+          <Border x:Name="OptionsCard" Theme="{StaticResource Card}" Padding="18,2" Margin="0,0,0,14">
+            <StackPanel>
+              <controls:SettingRow Title="Bei der Windows-Anmeldung starten" Description="Die App im Infobereich, für jeden Benutzer">
+                <ToggleSwitch x:Name="AutostartToggle" IsChecked="True" OnContent="" OffContent="" AutomationProperties.Name="Bei der Windows-Anmeldung starten" />
+              </controls:SettingRow>
+              <controls:SettingRow Title="Verknüpfung auf dem Desktop" Description="Ein Startmenü-Eintrag wird immer angelegt">
+                <ToggleSwitch x:Name="DesktopToggle" OnContent="" OffContent="" AutomationProperties.Name="Verknüpfung auf dem Desktop" />
+              </controls:SettingRow>
+              <controls:SettingRow Title="Updates automatisch installieren" Description="Neue Versionen von ThixInstall ohne Rückfrage" BorderThickness="0">
+                <ToggleSwitch x:Name="AutoUpdateToggle" IsChecked="True" OnContent="" OffContent="" AutomationProperties.Name="Updates automatisch installieren" />
+              </controls:SettingRow>
+            </StackPanel>
+          </Border>
+          <Border x:Name="CloudCard" Theme="{StaticResource Card}" Padding="18,14" Margin="0,0,0,14">
+            <StackPanel>
+              <TextBlock Text="Mit ThixInstall.Cloud verbinden (optional)" FontWeight="SemiBold" Margin="0,0,0,4" />
+              <TextBlock Theme="{StaticResource MutedText}" Margin="0,0,0,12"
+                         Text="Mit dem Registrierungsschlüssel eines Profils meldet sich das Gerät gleich an und bekommt das Profil. Leer lassen: später unter Einstellungen › Cloud." />
+              <controls:FormField Label="Adresse der Cloud">
+                <TextBox x:Name="CloudBox" Watermark="https://install.example.com" />
+              </controls:FormField>
+              <controls:FormField Label="Registrierungsschlüssel" Margin="0">
+                <TextBox x:Name="KeyBox" />
+              </controls:FormField>
+            </StackPanel>
+          </Border>
+          <controls:InfoBar x:Name="PlaceInfo" />
+        </StackPanel>
+
+        <!-- Uninstall -->
+        <StackPanel x:Name="ConfirmPage" IsVisible="False">
+          <TextBlock Text="ThixInstall entfernen" Theme="{StaticResource SectionTitle}" FontSize="20" Margin="0,0,0,10" />
+          <TextBlock TextWrapping="Wrap" Margin="0,0,0,16" LineHeight="21"
+                     Text="Programm, Dienst, Startmenü-Eintrag, Desktop-Verknüpfung und Autostart werden entfernt. Installierte Apps bleiben, das Gerät bleibt in der Cloud aufgeführt." />
+          <Border Theme="{StaticResource Card}" Padding="18,2">
+            <controls:SettingRow Title="Auch die Cloud-Verbindung löschen" BorderThickness="0"
+                                 Description="Verbindung, Aufträge und Protokolle des Agenten. Ohne Haken bleiben sie für eine spätere Installation erhalten.">
+              <ToggleSwitch x:Name="DeleteDataToggle" OnContent="" OffContent="" AutomationProperties.Name="Auch die Cloud-Verbindung löschen" />
+            </controls:SettingRow>
+          </Border>
+        </StackPanel>
+
+        <!-- Work in progress -->
+        <StackPanel x:Name="ProgressPage" IsVisible="False">
+          <TextBlock x:Name="ProgressTitle" Text="Installiere …" Theme="{StaticResource SectionTitle}" FontSize="20" Margin="0,0,0,12" />
+          <ProgressBar x:Name="Progress" Height="4" MinHeight="4" IsIndeterminate="True" Margin="0,0,0,16" />
+          <ItemsControl x:Name="StepList">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <DockPanel Margin="0,0,0,6">
+                  <controls:IconView DockPanel.Dock="Left" Data="{StaticResource Icon.Check}" Width="16" Height="16"
+                                     Foreground="{DynamicResource SuccessBrush}" Margin="0,0,10,0" />
+                  <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                </DockPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <!-- Done -->
+        <StackPanel x:Name="FinishPage" IsVisible="False">
+          <TextBlock x:Name="FinishTitle" Text="ThixInstall ist bereit" Theme="{StaticResource SectionTitle}" FontSize="20" Margin="0,0,0,12" />
+          <controls:InfoBar x:Name="ResultBar" />
+          <Border x:Name="StartCard" Theme="{StaticResource Card}" Padding="18,2">
+            <controls:SettingRow Title="ThixInstall jetzt starten" BorderThickness="0">
+              <ToggleSwitch x:Name="StartToggle" IsChecked="True" OnContent="" OffContent="" AutomationProperties.Name="ThixInstall jetzt starten" />
+            </controls:SettingRow>
+          </Border>
+        </StackPanel>
+      </Grid>
+    </ScrollViewer>
+  </DockPanel>
+</local:ThemedWindow>

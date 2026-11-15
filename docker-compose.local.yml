@@ -1,0 +1,73 @@
+# ThixInstall.Cloud - Local (builds the image from this folder) with pgAdmin
+#   ./scripts/redeploy.ps1              (rebuilds and starts the stack: the way to test every change)
+#   docker compose -f docker-compose.local.yml up -d --build
+#   App:      http://localhost:4955
+#   pgAdmin:  http://localhost:4956   (no sign-in; database password: thixinstall)
+#   Postgres: localhost:4957          (for "dotnet run" outside Docker, see appsettings.Development.json)
+name: thixinstall-local
+
+services:
+  web:
+    build: .
+    image: thixinstall:local
+    restart: unless-stopped
+    ports:
+      - "4955:4955"
+    volumes:
+      - web-data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    ports:
+      - "4957:5432"
+    environment:
+      POSTGRES_DB: thixinstall
+      POSTGRES_USER: thixinstall
+      POSTGRES_PASSWORD: thixinstall
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thixinstall -d thixinstall"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    ports:
+      - "4956:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@thixinstall.example.com
+      PGADMIN_DEFAULT_PASSWORD: thixinstall
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    configs:
+      - source: servers
+        target: /pgadmin4/servers.json
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      - db
+
+configs:
+  servers:
+    content: |
+      {"Servers": {"1": {"Name": "ThixInstall (local)", "Group": "Servers", "Host": "db", "Port": 5432, "MaintenanceDB": "thixinstall", "Username": "thixinstall", "SSLMode": "prefer"}}}
+
+volumes:
+  web-data:
+  db-data:
+  pgadmin-data:
+
+# A fixed subnet: on a machine with many stacks Docker runs out of address pools otherwise
+# ("all predefined address pools have been fully subnetted").
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.253.57.0/24

@@ -1,0 +1,87 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The desktop application for Windows and macOS (Avalonia): the main window, tray / menu bar icon, the bundle runner and -
+    on Windows - its own setup and the agent service (argument "service"): one program for all of it.
+    Windows: published self-contained single-file for win-x64; that ThixInstall.exe is its own setup (InstallService).
+    macOS:   published self-contained for osx-arm64 / osx-x64 and packed into ThixInstall.app (scripts/package-macos.sh).
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>$(DesktopTargetFramework)</TargetFramework>
+    <AssemblyName>ThixInstall</AssemblyName>
+    <RootNamespace>ThixInstall</RootNamespace>
+    <ApplicationIcon>Assets\thixinstall.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyTitle>ThixInstall</AssemblyTitle>
+    <AvaloniaVersion>11.3.22</AvaloniaVersion>
+    <!-- Bindings in data templates resolve by reflection (the rows are plain view models). -->
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <SupportedOSPlatformVersion Condition="'$(OS)' == 'Windows_NT'">10.0.17763.0</SupportedOSPlatformVersion>
+    <!-- Start-up speed: the app starts at sign-in and must open its window at once. -->
+    <TieredPGO>true</TieredPGO>
+    <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <DebugType>none</DebugType>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    <!-- No .pdb/.xml of the libraries next to the program either: the package is the program alone. -->
+    <AllowedReferenceRelatedFileExtensions>none</AllowedReferenceRelatedFileExtensions>
+    <!-- Ready-to-run code: the window comes up without waiting for the JIT. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+
+  <!--
+    Windows: one file, which is also the setup, the bundle runner and the service (Program, App). Trimmed in "partial" mode: only libraries that
+    declare themselves trimmable (the .NET runtime, Avalonia) lose what ThixInstall
+    never calls; ThixInstall's own assemblies stay whole, so reflection bindings and the JSON of our own types keep working.
+    That roughly halves the download. The self test of the published program (SelfTest.cs, run by CI)
+    proves that the trimmed program works.
+  -->
+  <PropertyGroup Condition="$(RuntimeIdentifier.StartsWith('win-'))">
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <!-- Settings, sync and the update manifest use reflection-based JSON (our own types, kept whole). -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <DefineConstants>$(DefineConstants);SINGLE_FILE</DefineConstants>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <!-- macOS: the files go into ThixInstall.app/Contents/MacOS (scripts/package-macos.sh). -->
+  <PropertyGroup Condition="$(RuntimeIdentifier.StartsWith('osx-'))">
+    <UseAppHost>true</UseAppHost>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ThixInstall.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ThixInstall.Core\ThixInstall.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\thixinstall.ico" />
+    <AvaloniaResource Include="Assets\tray-windows.ico" />
+    <AvaloniaResource Include="Assets\tray-macos.png" />
+    <AvaloniaResource Include="Assets\logo-256.png" />
+    <AvaloniaResource Include="Assets\logo-64.png" />
+  </ItemGroup>
+
+</Project>

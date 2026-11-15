@@ -1,0 +1,150 @@
+@page "/Profiles/Edit"
+@model ThixInstall.Cloud.Pages.Profiles.EditModel
+@{
+    var title = Model.IsNew ? "Neues Profil" : Model.Profile!.Name;
+    ViewData["Title"] = title;
+    ViewData["PageSub"] = Model.IsNew ? "Ein Name, dann die Apps und Skripte." : $"{Model.Profile!.Devices} Geräte";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Katalog", null), ("Profile", "/Profiles"), (Model.IsNew ? "Neu" : title, null) };
+    ViewData["Width"] = "narrow";
+    var url = $"/Profiles/Edit?id={Model.Id}";
+}
+
+@if (!Model.IsNew)
+{
+    <ti-tabs label="Profil">
+        <ti-tab href="@url" active="@(Model.Tab == "general")" icon="info">Allgemein</ti-tab>
+        <ti-tab href="@(url + "&tab=items")" active="@(Model.Tab == "items")" icon="box">Inhalte</ti-tab>
+        <ti-tab href="@(url + "&tab=devices")" active="@(Model.Tab == "devices")" icon="monitor">Geräte</ti-tab>
+        <ti-tab href="@(url + "&tab=enroll")" active="@(Model.Tab == "enroll")" icon="key">Registrierung</ti-tab>
+    </ti-tabs>
+}
+
+@switch (Model.Tab)
+{
+    case "items":
+        <form class="mat-form" method="post" asp-page-handler="Add" asp-route-id="@Model.Id" asp-route-tab="items" novalidate>
+            <partial name="_FormSummary" model="ViewData.ModelState" />
+            <div class="mat-card">
+                <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("list")Inhalte</h2></div>
+                @if (Model.Items.Count == 0)
+                {
+                    <div class="mat-card__body"><p class="mat-muted">Noch leer. Füge Apps und Skripte hinzu – Geräte mit diesem Profil bekommen sie als Aufträge, in dieser Reihenfolge.</p></div>
+                }
+                else
+                {
+                    <ul class="mat-itemlist">
+                        @for (var i = 0; i < Model.Items.Count; i++)
+                        {
+                            var item = Model.Items[i];
+                            <li class="mat-item">
+                                <div class="mat-item__main">
+                                    <span class="mat-item__lead">
+                                        @if (item.PackageId is { } pid) { @Ui.AppIcon(pid, "p" + pid, item.Name, item.HasIcon, "sm") }
+                                        else { <span class="ti-appicon ti-appicon--sm ti-appicon--script" aria-hidden="true">@Ui.Icon("terminal")</span> }
+                                    </span>
+                                    <span class="mat-item__body"><span class="mat-item__title">@item.Name</span><span class="mat-item__text">@(item.PackageId is null ? "Skript" : "App") · @item.Category · @item.Systems</span></span>
+                                </div>
+                                <div class="mat-item__aside">
+                                    <button type="submit" class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" formaction="@($"{url}&tab=items&handler=Move&itemId={item.Id}&direction=-1")" formnovalidate disabled="@(i == 0)" aria-label="@item.Name nach oben" data-tip="Nach oben">@Ui.Icon("arrow-up")</button>
+                                    <button type="submit" class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" formaction="@($"{url}&tab=items&handler=Move&itemId={item.Id}&direction=1")" formnovalidate disabled="@(i == Model.Items.Count - 1)" aria-label="@item.Name nach unten" data-tip="Nach unten">@Ui.Icon("arrow-down")</button>
+                                    <button type="submit" class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" formaction="@($"{url}&tab=items&handler=Remove&itemId={item.Id}")" formnovalidate data-confirm="@($"{item.Name} aus dem Profil nehmen?")" data-confirm-ok="Entfernen" data-confirm-danger aria-label="@item.Name entfernen" data-tip="Entfernen">@Ui.Icon("trash")</button>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+                <div class="mat-card__body mat-form">
+                    <ti-field name="Item" kind="select" label="Hinzufügen" value="@Model.Item" options="Model.ItemChoices" required msg-required="Bitte eine App oder ein Skript wählen."
+                              hint="Jedes Gerät bekommt nur, was es für sein System gibt." />
+                </div>
+            </div>
+            <div class="mat-btn-row">
+                <button type="submit" class="mat-btn mat-btn--primary">@Ui.Icon("plus")<span>Hinzufügen</span></button>
+                <a class="mat-btn mat-btn--secondary" href="/Profiles">@Ui.Icon("back")<span>Zurück</span></a>
+            </div>
+        </form>
+        break;
+
+    case "devices":
+        <div class="mat-list">
+            @if (Model.Devices.Count == 0)
+            {
+                <partial name="_Empty" model="@(new EmptyStateModel("monitor", "Noch kein Gerät", "Geräte bekommen das Profil über den Registrierungsschlüssel, über ein Paket mit diesem Profil oder auf ihrer Seite unter Einstellungen.", true, $"{url}&tab=enroll", "Zur Registrierung"))" />
+            }
+            else
+            {
+                <ti-table caption="Geräte mit diesem Profil">
+                    <thead><tr><th scope="col">Gerät</th><th scope="col">System</th><th scope="col">Sync</th><th scope="col">Zuletzt gesehen</th></tr></thead>
+                    <tbody>
+                        @foreach (var d in Model.Devices)
+                        {
+                            <tr>
+                                <td data-label="Gerät" class="mat-table__primary"><div class="mat-table__name">@Ui.Icon(Ui.OsIcon(d.Os))<a href="/Devices/Detail?id=@d.Id">@d.Name</a></div></td>
+                                <td data-label="System">@Ui.OsName(d.Os)</td>
+                                <td data-label="Sync">@(d.SyncEnabled ? "An" : "Aus")</td>
+                                <td data-label="Zuletzt gesehen" class="mat-table__keep-label">@Dates.Ago(d.LastSeenDate)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </ti-table>
+            }
+            <div class="mat-actions">
+                <a class="mat-btn mat-btn--primary" href="/Devices/Push?profile=@Model.Id">@Ui.Icon("rocket")<span>Auftrag an alle senden</span></a>
+            </div>
+        </div>
+        break;
+
+    case "enroll":
+        <form method="post" asp-route-id="@Model.Id" novalidate>
+            <div class="mat-card">
+                <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("key")Registrierungsschlüssel</h2></div>
+                <div class="mat-card__body mat-form">
+                    <div class="mat-field">
+                        <label class="mat-label" for="enroll-key">Ein Rechner, der sich mit diesem Schlüssel anmeldet, gehört zu dir und bekommt dieses Profil.</label>
+                        <div class="ti-copyline">
+                            <input class="mat-input mat-mono" id="enroll-key" value="@Model.Profile!.EnrollmentKey" readonly />
+                            <button type="button" class="mat-btn mat-btn--secondary" data-copy="#enroll-key">@Ui.Icon("copy")<span>Kopieren</span></button>
+                        </div>
+                    </div>
+                    <div class="mat-field">
+                        <label class="mat-label" for="enroll-command">Stille Installation unter Windows (z. B. per Gruppenrichtlinie oder Intune)</label>
+                        <div class="ti-copyline">
+                            <input class="mat-input mat-mono" id="enroll-command" value="ThixInstallSetup.exe --install --quiet --cloud @Model.CloudUrl --enroll-key @Model.Profile.EnrollmentKey" readonly />
+                            <button type="button" class="mat-btn mat-btn--secondary" data-copy="#enroll-command">@Ui.Icon("copy")<span>Kopieren</span></button>
+                        </div>
+                        <span class="mat-hint">ThixInstallSetup.exe gibt es im Release-Kanal auf GitHub und unter /api/v1/agent/win-x64 dieser Cloud.</span>
+                    </div>
+                </div>
+            </div>
+            <div class="mat-card">
+                <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("download")Herunterladen und starten</h2></div>
+                <div class="mat-card__body">
+                    <p>Ein Paket, das nur ThixInstall installiert und den Rechner mit diesem Profil anmeldet (30 Tage gültig).</p>
+                    <div class="mat-btn-row mat-btn-row--plain">
+                        <button type="submit" class="mat-btn mat-btn--primary" asp-page-handler="Download" asp-route-id="@Model.Id" asp-route-os="windows">@Ui.Icon("windows")<span>Für Windows</span></button>
+                        <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="Download" asp-route-id="@Model.Id" asp-route-os="macos">@Ui.Icon("apple")<span>Für macOS</span></button>
+                    </div>
+                </div>
+            </div>
+            <div class="mat-btn-row">
+                <a class="mat-btn mat-btn--secondary" href="/Profiles">@Ui.Icon("back")<span>Zurück</span></a>
+                <span class="mat-btn-row__spacer"></span>
+                <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Regenerate" asp-route-id="@Model.Id" data-confirm="Einen neuen Schlüssel erstellen? Der bisherige meldet dann keine Rechner mehr an (angemeldete bleiben)." data-confirm-ok="Neu erstellen" data-confirm-danger>@Ui.Icon("refresh")<span>Neuer Schlüssel</span></button>
+            </div>
+        </form>
+        break;
+
+    default:
+        <form class="mat-form" method="post" asp-route-id="@Model.Id" novalidate>
+            <partial name="_FormSummary" model="ViewData.ModelState" />
+            <div class="mat-card">
+                <div class="mat-card__body mat-form">
+                    <ti-field name="Name" label="Name" required value="@Model.Name" maxlength="120" msg-required="Bitte einen Namen eingeben." autofocus="@Model.IsNew" placeholder="z. B. Büro" />
+                    <ti-field name="Description" kind="textarea" label="Beschreibung" optional value="@Model.Description" maxlength="1000" rows="3" />
+                </div>
+            </div>
+            <ti-buttons save="@(Model.IsNew ? "Anlegen" : "Speichern")" save-icon="@(Model.IsNew ? "plus" : "save")" back="/Profiles" delete-handler="@(Model.IsNew ? null : "Delete")"
+                        delete-confirm="Dieses Profil löschen? Seine Geräte verlieren das Profil, behalten aber ihre Apps; der Schlüssel meldet keine Rechner mehr an." />
+        </form>
+        break;
+}

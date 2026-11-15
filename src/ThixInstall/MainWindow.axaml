@@ -1,0 +1,134 @@
+<local:ThemedWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="using:ThixInstall"
+                    xmlns:controls="using:ThixInstall.Controls"
+                    x:Class="ThixInstall.MainWindow"
+                    Title="ThixInstall" Width="1180" Height="780" MinWidth="760" MinHeight="480"
+                    WindowStartupLocation="CenterScreen"
+                    ExtendClientAreaToDecorationsHint="True">
+  <!--
+    The one window of ThixInstall: header (logo, search of the page, refresh, own caption buttons on Windows / traffic
+    lights on macOS), sidebar (sections with counts, the running job, the cloud, the version = about page) and the page.
+  -->
+  <Grid RowDefinitions="Auto,*">
+    <!-- ===== Header ===== -->
+    <Border x:Name="Header" Background="{DynamicResource HeaderBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
+            Height="64" PointerPressed="OnHeaderPointerPressed" DoubleTapped="OnHeaderDoubleTapped">
+      <Grid x:Name="HeaderGrid" ColumnDefinitions="248,*,Auto,Auto" Margin="22,0,12,0">
+        <StackPanel x:Name="Brand" Orientation="Horizontal" Spacing="11" VerticalAlignment="Center" IsHitTestVisible="False">
+          <Image Source="/Assets/logo-64.png" Width="30" Height="30" RenderOptions.BitmapInterpolationMode="HighQuality" />
+          <TextBlock x:Name="BrandName" VerticalAlignment="Center" FontSize="19" FontWeight="SemiBold">
+            <Run Text="Thix" /><Run Text="Install" Foreground="{DynamicResource AccentBrush}" />
+          </TextBlock>
+        </StackPanel>
+
+        <Panel Grid.Column="1" MaxWidth="560" HorizontalAlignment="Stretch" Margin="8,0,20,0" VerticalAlignment="Center">
+          <TextBox x:Name="SearchBox" Theme="{StaticResource SearchBox}" Watermark="Apps, Skripte und Aufträge durchsuchen"
+                   AutomationProperties.Name="Suchen" />
+          <controls:IconView Data="{StaticResource Icon.Search}" Width="18" Height="18" Margin="13,0,0,0" HorizontalAlignment="Left"
+                             Foreground="{DynamicResource TextMutedBrush}" IsHitTestVisible="False" />
+        </Panel>
+
+        <Button Grid.Column="2" x:Name="RefreshButton" Click="OnRefreshClick" Margin="0,0,10,0" VerticalAlignment="Center"
+                ToolTip.Tip="Katalog und installierte Apps neu einlesen (F5)" AutomationProperties.Name="Aktualisieren">
+          <controls:IconLabel x:Name="RefreshLabel" Icon="{StaticResource Icon.Sync}" Text="Aktualisieren" />
+        </Button>
+
+        <StackPanel Grid.Column="3" x:Name="CaptionButtons" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+          <Button Theme="{StaticResource CaptionButton}" Click="OnMinimizeClick" ToolTip.Tip="Minimieren" AutomationProperties.Name="Minimieren">
+            <controls:IconView Data="{StaticResource Icon.Minus}" Width="16" Height="16" StrokeWidth="1.6" />
+          </Button>
+          <Button Theme="{StaticResource CaptionButton}" Click="OnMaximizeClick" ToolTip.Tip="Maximieren" AutomationProperties.Name="Maximieren">
+            <controls:IconView x:Name="MaximizeIcon" Data="{StaticResource Icon.Maximize}" Width="15" Height="15" StrokeWidth="1.6" />
+          </Button>
+          <Button Theme="{StaticResource CloseCaptionButton}" Click="OnCloseClick" ToolTip.Tip="Schließen" AutomationProperties.Name="Schließen">
+            <controls:IconView Data="{StaticResource Icon.Close}" Width="16" Height="16" StrokeWidth="1.6" />
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- ===== Body ===== -->
+    <Grid Grid.Row="1" x:Name="BodyGrid" ColumnDefinitions="248,*">
+
+      <!-- Sidebar: full, or folded to its icons (Ctrl/Cmd+B, the button at its foot) -->
+      <Border x:Name="Sidebar" Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+        <DockPanel Margin="14,18,14,14">
+          <StackPanel DockPanel.Dock="Bottom" Spacing="12">
+            <!-- The running job -->
+            <Border x:Name="JobCard" Theme="{StaticResource Card}" Padding="14,12" IsVisible="False" Cursor="Hand" PointerPressed="OnJobCardPressed">
+              <StackPanel Spacing="8">
+                <DockPanel>
+                  <controls:IconView DockPanel.Dock="Left" Data="{StaticResource Icon.Activity}" Width="16" Height="16" Margin="0,0,8,0"
+                                     Foreground="{DynamicResource AccentBrush}" />
+                  <TextBlock x:Name="JobTitle" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
+                </DockPanel>
+                <ProgressBar x:Name="JobProgress" Height="4" MinHeight="4" IsIndeterminate="True" />
+                <TextBlock x:Name="JobStatus" Theme="{StaticResource FaintText}" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </Border>
+
+            <!-- Cloud state -->
+            <Button x:Name="CloudStatus" Theme="{StaticResource GhostButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                    Padding="8,6" Click="OnCloudStatusClick" ToolTip.Tip="ThixInstall.Cloud">
+              <StackPanel Orientation="Horizontal" Spacing="9">
+                <Panel>
+                  <controls:IconView Data="{StaticResource Icon.Cloud}" Width="18" Height="18" />
+                  <Ellipse x:Name="CloudDot" Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-2,-1" />
+                </Panel>
+                <TextBlock x:Name="CloudText" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="170" />
+              </StackPanel>
+            </Button>
+
+            <!-- Version = about page (bottom left); folded: an info icon above the button that unfolds -->
+            <Grid x:Name="SidebarFoot" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+              <Button x:Name="VersionButton" Theme="{StaticResource LinkButton}" Margin="8,0,0,0" VerticalAlignment="Center" Click="OnVersionClick"
+                      ToolTip.Tip="Über ThixInstall" AutomationProperties.Name="Über ThixInstall" />
+              <Button Grid.Column="1" x:Name="SidebarToggle" Theme="{StaticResource GhostButton}" VerticalAlignment="Center" Click="OnSidebarToggleClick">
+                <controls:IconView Data="{StaticResource Icon.Sidebar}" Width="18" Height="18" />
+              </Button>
+            </Grid>
+          </StackPanel>
+
+          <StackPanel>
+            <ToggleButton x:Name="NavCatalog" Theme="{StaticResource NavItem}" HorizontalContentAlignment="Stretch" Click="OnNavClick" Tag="Catalog">
+              <Grid ColumnDefinitions="*,Auto">
+                <controls:IconLabel Icon="{StaticResource Icon.Apps}" Text="Katalog" Spacing="13" />
+              </Grid>
+            </ToggleButton>
+            <ToggleButton x:Name="NavUpdates" Theme="{StaticResource NavItem}" HorizontalContentAlignment="Stretch" Click="OnNavClick" Tag="Updates">
+              <Grid ColumnDefinitions="*,Auto">
+                <controls:IconLabel Icon="{StaticResource Icon.Sync}" Text="Updates" Spacing="13" />
+                <Border Grid.Column="1" x:Name="UpdatesBadge" Theme="{StaticResource Badge}" IsVisible="False">
+                  <TextBlock x:Name="UpdatesCount" />
+                </Border>
+              </Grid>
+            </ToggleButton>
+            <ToggleButton x:Name="NavScripts" Theme="{StaticResource NavItem}" HorizontalContentAlignment="Stretch" Click="OnNavClick" Tag="Scripts">
+              <Grid ColumnDefinitions="*,Auto">
+                <controls:IconLabel Icon="{StaticResource Icon.Terminal}" Text="Skripte" Spacing="13" />
+              </Grid>
+            </ToggleButton>
+            <ToggleButton x:Name="NavJobs" Theme="{StaticResource NavItem}" HorizontalContentAlignment="Stretch" Click="OnNavClick" Tag="Jobs">
+              <Grid ColumnDefinitions="*,Auto">
+                <controls:IconLabel Icon="{StaticResource Icon.ListChecks}" Text="Aufträge" Spacing="13" />
+                <Border Grid.Column="1" x:Name="JobsBadge" Theme="{StaticResource Badge}" IsVisible="False">
+                  <TextBlock x:Name="JobsCount" />
+                </Border>
+              </Grid>
+            </ToggleButton>
+            <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="12,10,12,14" />
+            <ToggleButton x:Name="NavSettings" Theme="{StaticResource NavItem}" HorizontalContentAlignment="Stretch" Click="OnNavClick" Tag="Settings">
+              <Grid ColumnDefinitions="*,Auto">
+                <controls:IconLabel Icon="{StaticResource Icon.Settings}" Text="Einstellungen" Spacing="13" />
+              </Grid>
+            </ToggleButton>
+          </StackPanel>
+        </DockPanel>
+      </Border>
+
+      <!-- Page -->
+      <ContentControl Grid.Column="1" x:Name="PageHost" />
+    </Grid>
+  </Grid>
+</local:ThemedWindow>

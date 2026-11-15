@@ -1,0 +1,156 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ThixInstall.Controls"
+             x:Class="ThixInstall.Pages.CatalogPage">
+  <!--
+    The catalog of the cloud: apps as tiles (grouped by category) or as a list. Toolbar above (category, filter, sort,
+    view), the actions for the chosen apps below and left (positive to negative, "Deinstallieren" with a gap).
+    A click on a tile chooses it; the search is the field in the header.
+  -->
+  <UserControl.Styles>
+    <Style Selector="Border.tile">
+      <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Border.tile:pointerover">
+      <Setter Property="BorderBrush" Value="{DynamicResource StrongBorderBrush}" />
+    </Style>
+    <Style Selector="Border.tile.selected">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="Border.row">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Border.row:pointerover">
+      <Setter Property="Background" Value="{DynamicResource HoverBrush}" />
+    </Style>
+    <Style Selector="Border.row.selected">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Background="{DynamicResource SurfaceBrush}">
+    <DockPanel Margin="28,22,28,20">
+      <StackPanel DockPanel.Dock="Top">
+        <TextBlock Text="Katalog" Theme="{StaticResource PageTitle}" />
+        <TextBlock x:Name="Summary" Theme="{StaticResource MutedText}" Margin="0,4,0,14" />
+        <controls:InfoBar x:Name="Message" />
+        <controls:Toolbar x:Name="ToolbarRow">
+          <ComboBox x:Name="CategoryChoice" MinWidth="180" AutomationProperties.Name="Kategorie" />
+          <ComboBox x:Name="FilterChoice" MinWidth="180" SelectedIndex="0" AutomationProperties.Name="Filter">
+            <ComboBoxItem Content="Alle Apps" />
+            <ComboBoxItem Content="Installiert" />
+            <ComboBoxItem Content="Nicht installiert" />
+            <ComboBoxItem Content="Update verfügbar" />
+          </ComboBox>
+          <ComboBox x:Name="SortChoice" MinWidth="170" SelectedIndex="0" AutomationProperties.Name="Sortierung">
+            <ComboBoxItem Content="Nach Kategorie" />
+            <ComboBoxItem Content="Nach Name" />
+            <ComboBoxItem Content="Nach Hersteller" />
+          </ComboBox>
+          <Button x:Name="ViewToggle" Click="OnViewToggleClick">
+            <controls:IconLabel x:Name="ViewLabel" Icon="{StaticResource Icon.List}" Text="Liste" />
+          </Button>
+        </controls:Toolbar>
+      </StackPanel>
+
+      <!-- Actions for the chosen apps: below the list, left, positive to negative, removing with a gap -->
+      <controls:ActionBar DockPanel.Dock="Bottom" Margin="0,14,0,0">
+        <Button x:Name="InstallButton" Theme="{StaticResource PrimaryButton}" Click="OnInstallClick">
+          <controls:IconLabel x:Name="InstallLabel" Icon="{StaticResource Icon.Download}" Text="Installieren" />
+        </Button>
+        <Button x:Name="UpdateButton" Click="OnUpdateClick">
+          <controls:IconLabel x:Name="UpdateLabel" Icon="{StaticResource Icon.Sync}" Text="Aktualisieren" />
+        </Button>
+        <Button x:Name="ClearButton" Click="OnClearClick">
+          <controls:IconLabel Icon="{StaticResource Icon.Close}" Text="Auswahl aufheben" />
+        </Button>
+        <Button x:Name="UninstallButton" Theme="{StaticResource DangerButton}" Click="OnUninstallClick" controls:ActionBar.Separated="True">
+          <controls:IconLabel x:Name="UninstallLabel" Icon="{StaticResource Icon.Delete}" Text="Deinstallieren" />
+        </Button>
+      </controls:ActionBar>
+
+      <Panel>
+        <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <Panel>
+            <!-- Tiles, grouped -->
+            <ItemsControl x:Name="Groups">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Margin="0,0,0,10">
+                    <TextBlock Text="{Binding Name}" Theme="{StaticResource SectionTitle}" FontSize="15" Margin="2,0,0,10"
+                               IsVisible="{Binding HasName}" />
+                    <ItemsControl ItemsSource="{Binding Items}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <WrapPanel ItemSpacing="12" LineSpacing="12" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Border Classes="tile" Classes.selected="{Binding IsSelected}" Width="244" Padding="14,13"
+                                  PointerPressed="OnItemPressed" ToolTip.Tip="{Binding Description}">
+                            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                              <controls:AppIcon Grid.RowSpan="2" Size="46" NameText="{Binding Name}" Key="{Binding Key}" Image="{Binding Icon}"
+                                                VerticalAlignment="Top" />
+                              <StackPanel Grid.Column="1" Margin="12,1,6,0" Spacing="1">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14.5" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Subtitle}" Theme="{StaticResource FaintText}" TextTrimming="CharacterEllipsis" />
+                              </StackPanel>
+                              <CheckBox Grid.Column="2" IsChecked="{Binding IsSelected}" VerticalAlignment="Top" Margin="0,-4,-6,0" MinWidth="0"
+                                        AutomationProperties.Name="{Binding Name}" />
+                              <controls:StatusChip Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="12,8,0,0"
+                                                   Text="{Binding StateText}" Tone="{Binding StateTone}" />
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- List -->
+            <ItemsControl x:Name="Rows" IsVisible="False">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Classes="row" Classes.selected="{Binding IsSelected}" Padding="10,9" PointerPressed="OnItemPressed" ToolTip.Tip="{Binding Description}">
+                    <Grid ColumnDefinitions="Auto,Auto,*,160,Auto">
+                      <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" MinWidth="0" Margin="0,0,6,0"
+                                AutomationProperties.Name="{Binding Name}" />
+                      <controls:AppIcon Grid.Column="1" Size="32" NameText="{Binding Name}" Key="{Binding Key}" Image="{Binding Icon}" />
+                      <StackPanel Grid.Column="2" Margin="12,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Subtitle}" Theme="{StaticResource FaintText}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="3" Text="{Binding Category}" Theme="{StaticResource MutedText}" VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                      <controls:StatusChip Grid.Column="4" Text="{Binding StateText}" Tone="{Binding StateTone}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Panel>
+        </ScrollViewer>
+
+        <!-- Nothing to show -->
+        <StackPanel x:Name="EmptyState" IsVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="420">
+          <controls:IconView Data="{StaticResource Icon.Box}" Width="44" Height="44" Foreground="{DynamicResource TextFaintBrush}" HorizontalAlignment="Center" />
+          <TextBlock x:Name="EmptyText" TextAlignment="Center" TextWrapping="Wrap" Theme="{StaticResource MutedText}" FontSize="14" />
+          <Button x:Name="ConnectButton" HorizontalAlignment="Center" Theme="{StaticResource PrimaryButton}" Click="OnConnectClick" IsVisible="False">
+            <controls:IconLabel Icon="{StaticResource Icon.Cloud}" Text="Mit Cloud verbinden …" />
+          </Button>
+        </StackPanel>
+      </Panel>
+    </DockPanel>
+  </Border>
+</UserControl>

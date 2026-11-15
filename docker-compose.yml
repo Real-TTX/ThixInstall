@@ -1,0 +1,36 @@
+# ThixInstall.Cloud - Release (branch main, image :latest)
+#   docker compose up -d        ->  http://localhost:4955
+# The first visit opens the setup assistant: it creates the administrator; the catalog starts with popular apps. The start page
+# puts bundles together; installed ThixInstall apps enroll here. Put a TLS proxy in front of it for use over the internet.
+name: thixinstall
+
+services:
+  web:
+    image: ghcr.io/real-ttx/thixinstall:latest
+    restart: unless-stopped
+    ports:
+      - "4955:4955"
+    volumes:
+      - web-data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: thixinstall
+      POSTGRES_USER: thixinstall
+      POSTGRES_PASSWORD: thixinstall
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thixinstall -d thixinstall"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  web-data:
+  db-data:

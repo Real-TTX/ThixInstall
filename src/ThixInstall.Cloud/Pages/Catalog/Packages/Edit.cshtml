@@ -1,0 +1,144 @@
+@page "/Catalog/Packages/Edit"
+@model ThixInstall.Cloud.Pages.Catalog.Packages.EditModel
+@{
+    ViewData["Title"] = Model.Title;
+    ViewData["PageSub"] = Model.IsNew ? "Name und Kategorie; die Quellen kommen danach." : $"Schlüssel {Model.Key} · aufgelöst {Dates.Stamp(Model.ResolvedDate)}";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Katalog", null), ("Apps", "/Catalog/Packages"), (Model.IsNew ? "Neu" : Model.Name, null) };
+    ViewData["Width"] = "narrow";
+    var url = $"/Catalog/Packages/Edit?id={Model.Id}";
+    var deleteConfirm = $"{Model.Name} löschen? Profile und Pakete bieten die App danach nicht mehr an; installierte Apps bleiben auf den Geräten.";
+}
+
+@if (!Model.IsNew)
+{
+    <ti-tabs label="App">
+        <ti-tab href="@url" active="@(Model.Tab == "general")" icon="info">Allgemein</ti-tab>
+        <ti-tab href="@(url + "&tab=windows")" active="@(Model.Tab == "windows")" icon="windows">Windows</ti-tab>
+        <ti-tab href="@(url + "&tab=macos")" active="@(Model.Tab == "macos")" icon="apple">macOS</ti-tab>
+        <ti-tab href="@(url + "&tab=versions")" active="@(Model.Tab == "versions")" icon="layers">Versionen</ti-tab>
+    </ti-tabs>
+}
+
+@switch (Model.Tab)
+{
+    case "windows":
+        <form class="mat-form" method="post" asp-page-handler="Windows" asp-route-id="@Model.Id" asp-route-tab="windows" novalidate>
+            <partial name="_FormSummary" model="ViewData.ModelState" />
+            <div class="mat-card">
+                <div class="mat-card__body mat-form">
+                    <ti-field name="WindowsMethod" kind="radios" label="Quelle" value="@Model.WindowsMethod" options="EditModel.WindowsMethods" />
+                    <ti-field name="WingetId" label="winget-Id" value="@Model.WingetId" mono required maxlength="200" placeholder="Mozilla.Firefox" show-if="WindowsMethod" show-value="Winget"
+                              hint="Wie bei „winget install --id“. Zu finden mit „winget search“ oder auf winget.run." msg-required="Bitte die winget-Id angeben." />
+                    <ti-field name="ChocoId" label="Chocolatey-Id" value="@Model.ChocoId" mono maxlength="200" placeholder="firefox" show-if="WindowsMethod" show-value="Chocolatey,Winget"
+                              hint="Für Chocolatey: der Name bei community.chocolatey.org. Bei winget nur zur Information." />
+                    <ti-field name="DirectUrl" kind="url" label="Adresse des Installers" value="@Model.DirectUrl" mono required maxlength="1000" placeholder="https://…/setup.exe" show-if="WindowsMethod" show-value="Direct" msg-required="Bitte die Adresse angeben." />
+                    <ti-field name="DirectSilentArguments" label="Parameter für die stille Installation" value="@Model.DirectSilentArguments" mono maxlength="500" placeholder="/S" show-if="WindowsMethod" show-value="Direct"
+                              hint="Bei einer .msi leer lassen: /qn /norestart." />
+                    <ti-field name="DirectSha256" label="SHA-256" optional value="@Model.DirectSha256" mono maxlength="64" show-if="WindowsMethod" show-value="Direct" hint="Wenn angegeben, prüft die Cloud den Download." />
+                    <ti-field name="DirectVersion" label="Version" optional value="@Model.DirectVersion" maxlength="60" show-if="WindowsMethod" show-value="Direct" hint="Für die Anzeige von Updates." />
+                    <ti-field name="DetectDisplayName" label="Erkennen an (Name unter „Installierte Apps“)" optional value="@Model.DetectDisplayName" maxlength="200" placeholder="@Model.Name" show-if="WindowsMethod" show-value="Winget,Chocolatey,Direct"
+                              hint="Der Anfang des Namens, z. B. „Mozilla Firefox“. Mit ^ am Anfang ein regulärer Ausdruck. Leer: der Name der App." />
+                </div>
+            </div>
+            <ti-buttons save="Speichern und auflösen" save-icon="refresh" back="/Catalog/Packages" delete-handler="Delete" delete-confirm="@deleteConfirm" />
+        </form>
+        break;
+
+    case "macos":
+        <form class="mat-form" method="post" asp-page-handler="Mac" asp-route-id="@Model.Id" asp-route-tab="macos" novalidate>
+            <partial name="_FormSummary" model="ViewData.ModelState" />
+            <div class="mat-card">
+                <div class="mat-card__body mat-form">
+                    <ti-field name="MacMethod" kind="radios" label="Quelle" value="@Model.MacMethod" options="EditModel.MacMethods" />
+                    <ti-field name="BrewName" label="Name bei Homebrew" value="@Model.BrewName" mono required maxlength="200" placeholder="firefox" show-if="MacMethod" show-value="HomebrewCask,Homebrew"
+                              hint="Wie bei „brew install --cask firefox“ bzw. „brew install git“. Zu finden auf formulae.brew.sh." msg-required="Bitte den Namen angeben." />
+                    <ti-field name="MacAppBundleName" label="Name der App" optional value="@Model.MacAppBundleName" maxlength="200" placeholder="Firefox.app" show-if="MacMethod" show-value="HomebrewCask"
+                              hint="Woran ThixInstall die installierte App in /Programme erkennt. Leer: was der Cask nennt." />
+                </div>
+            </div>
+            <ti-buttons save="Speichern und auflösen" save-icon="refresh" back="/Catalog/Packages" delete-handler="Delete" delete-confirm="@deleteConfirm" />
+        </form>
+        break;
+
+    case "versions":
+        <div class="mat-list">
+            @if (Model.Releases.Count == 0)
+            {
+                <partial name="_Empty" model="@(new EmptyStateModel("layers", "Noch nichts aufgelöst", "Gib unter Windows oder macOS eine Quelle an – die Cloud löst sie dann auf.", false))" />
+            }
+            else
+            {
+                <ti-table caption="Versionen">
+                    <thead><tr><th scope="col">System</th><th scope="col">Version</th><th scope="col">Installer</th><th scope="col" class="mat-hide-sm">Cache</th><th scope="col" class="mat-hide-md">Aufgelöst</th></tr></thead>
+                    <tbody>
+                        @foreach (var r in Model.Releases)
+                        {
+                            <tr>
+                                <td data-label="System" class="mat-table__primary"><div class="mat-table__name">@Ui.Icon(Ui.OsIcon(r.Os))<span>@Ui.OsName(r.Os) @DeviceService.ArchitectureName(r.Architecture)<small class="mat-muted">@ReleaseService.MethodName(r.Method)</small></span></div></td>
+                                <td data-label="Version" class="mat-mono">@(r.Version ?? "–")</td>
+                                <td data-label="Installer">
+                                    @if (r.InstallerUrl is not null)
+                                    {
+                                        <span>@ReleaseService.KindName(r.Kind)</span><small class="mat-muted mat-mono ti-break"> @r.FileName @(string.IsNullOrEmpty(r.SilentArguments) ? "" : "· " + r.SilentArguments)</small>
+                                    }
+                                    else
+                                    {
+                                        <span>@ReleaseService.KindName(null)</span>
+                                    }
+                                    @if (r.Note is not null) { <small class="mat-muted ti-block">@r.Note</small> }
+                                    @if (r.Error is not null) { <small class="ti-error-text">@r.Error</small> }
+                                </td>
+                                <td data-label="Cache" class="mat-hide-sm">@if (r.InstallerUrl is null) { <span class="mat-muted">–</span> } else if (r.IsCached) { <span class="mat-pill mat-pill--ok">Im Cache</span> } else { <span class="mat-pill mat-pill--plain">Beim ersten Abruf</span> }</td>
+                                <td data-label="Aufgelöst" class="mat-hide-md">@Dates.Stamp(r.ResolvedDate)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </ti-table>
+            }
+            <form method="post" class="mat-actions">
+                <button type="submit" class="mat-btn mat-btn--primary" asp-page-handler="Resolve" asp-route-id="@Model.Id">@Ui.Icon("refresh")<span>Jetzt auflösen</span></button>
+                <a class="mat-btn mat-btn--secondary" href="/Catalog/Packages">@Ui.Icon("back")<span>Zurück</span></a>
+            </form>
+        </div>
+        break;
+
+    default:
+        <form class="mat-form" method="post" asp-route-id="@Model.Id" enctype="multipart/form-data" novalidate>
+            <partial name="_FormSummary" model="ViewData.ModelState" />
+            <div class="mat-card">
+                <div class="mat-card__body mat-form">
+                    <ti-field name="Name" label="Name" required value="@Model.Name" maxlength="120" msg-required="Bitte einen Namen eingeben." autofocus="@Model.IsNew" />
+                    <ti-field name="Key" label="Schlüssel" optional value="@Model.Key" mono maxlength="64" placeholder="wird aus dem Namen gebildet" hint="Kurz und fest, z. B. „firefox“: a–z, Ziffern, Bindestriche." />
+                    <ti-field name="Category" label="Kategorie" required value="@Model.Category" maxlength="60" suggest="Model.Categories" msg-required="Bitte eine Kategorie angeben." />
+                    <ti-field name="Publisher" label="Herausgeber" optional value="@Model.Publisher" maxlength="120" />
+                    <ti-field name="Description" kind="textarea" label="Beschreibung" optional value="@Model.Description" maxlength="1000" rows="3" hint="Ein Satz für die Startseite." />
+                    <ti-field name="Homepage" kind="url" label="Homepage" optional value="@Model.Homepage" maxlength="500" placeholder="https://" hint="Von dort holt die Cloud einmal das Icon, wenn keins hochgeladen ist." />
+                </div>
+            </div>
+            <div class="mat-card">
+                <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("image")Icon</h2></div>
+                <div class="mat-card__body mat-form">
+                    @if (Model.HasIcon)
+                    {
+                        <div class="ti-inline">@Ui.AppIcon(Model.Id!.Value, Model.Key, Model.Name, true, "lg")<span class="mat-muted">Das aktuelle Icon</span></div>
+                    }
+                    <ti-field name="Icon" kind="file" label="@(Model.HasIcon ? "Neues Icon" : "Icon")" optional accept=".png,.svg,.ico,.jpg,.jpeg,.webp,image/png,image/svg+xml,image/x-icon,image/jpeg,image/webp" max-size="512KB"
+                              hint="PNG, SVG, ICO, JPEG oder WebP bis 512 KB, am besten quadratisch." />
+                </div>
+            </div>
+            <div class="mat-card">
+                <div class="mat-card__body mat-form">
+                    <ti-field name="IsPublic" kind="switch" label="Öffentlich: auch Besucher ohne Konto sehen die App" value="@Model.IsPublic.ToString()" />
+                    <ti-field name="IsFeatured" kind="switch" label="Beliebt: steht auf der Startseite vorne" value="@Model.IsFeatured.ToString()" />
+                    <ti-field name="SortOrder" kind="number" label="Reihenfolge in der Kategorie" value="@Model.SortOrder" hint="Kleinere Zahlen zuerst." />
+                </div>
+            </div>
+            <ti-buttons save="@(Model.IsNew ? "Anlegen" : "Speichern")" save-icon="@(Model.IsNew ? "plus" : "save")" back="/Catalog/Packages" delete-handler="@(Model.IsNew ? null : "Delete")" delete-confirm="@deleteConfirm">
+                @if (Model.HasIcon)
+                {
+                    <button type="submit" class="mat-btn mat-btn--secondary ti-btn-collapse" formaction="@($"/Catalog/Packages/Edit?id={Model.Id}&handler=RemoveIcon")" formnovalidate aria-label="Icon entfernen" data-tip="Icon entfernen">@Ui.Icon("image")<span>Icon entfernen</span></button>
+                }
+            </ti-buttons>
+        </form>
+        break;
+}

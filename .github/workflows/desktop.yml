@@ -1,0 +1,284 @@
+name: desktop
+
+# Builds, tests and packages the ThixInstall desktop app for Windows and macOS for every branch.
+#   main  -> release : <major>.<minor>.<run number>-<date>   e.g. 0.1.42-20261115
+#   dev   -> nightly : nightly-<run number>-<date>          e.g. nightly-43-20261115
+#   other -> local   : local-<date>                          (pull requests, feature branches)
+# The run number grows with every build of this workflow and is the build number the update check compares.
+#
+# Packages:
+#   Windows : ThixInstallSetup.exe (the program is its own setup: install, update, uninstall)
+#   macOS   : ThixInstall-macOS-<arm64|x64>.dmg (first installation) and .zip (update of installed versions)
+#   every build      : workflow artifact "ThixInstall-<version>" (all packages + update manifest)
+#   main (push)      : rolling release "release-channel" (OTA feed of release builds) + versioned release "v<version>"
+#   dev  (push)      : rolling pre-release "nightly-channel" (OTA feed of nightly builds)
+# The server (ThixInstall.Cloud, Docker image) has its own workflow: cloud.yml.
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'src/ThixInstall/**'
+      - 'src/ThixInstall.Core/**'
+      - 'src/ThixInstall.Shared/**'
+      - 'tests/ThixInstall.Tests/**'
+      - 'branding/**'
+      - 'scripts/package-macos.sh'
+      - 'Directory.Build.props'
+      - 'global.json'
+      - '.github/workflows/desktop.yml'
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'src/ThixInstall/**'
+      - 'src/ThixInstall.Core/**'
+      - 'src/ThixInstall.Shared/**'
+      - 'tests/ThixInstall.Tests/**'
+      - 'branding/**'
+      - 'scripts/package-macos.sh'
+      - 'Directory.Build.props'
+      - 'global.json'
+      - '.github/workflows/desktop.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# One run per branch at a time: two quick pushes must not upload to the same release channel at once (queued, not cancelled).
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.ver.outputs.channel }}
+      date: ${{ steps.ver.outputs.date }}
+      build: ${{ steps.ver.outputs.build }}
+      version: ${{ steps.ver.outputs.version }}
+      props: ${{ steps.ver.outputs.props }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # One version for every platform of this run (the jobs may run across midnight).
+      - name: Determine version metadata
+        id: ver
+        shell: bash
+        run: |
+          case "${GITHUB_REF_NAME}" in
+            main) channel=release ;;
+            dev)  channel=nightly ;;
+            *)    channel=local ;;
+          esac
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then channel=local; fi
+          date=$(date -u +%Y%m%d)
+          build=${GITHUB_RUN_NUMBER}
+          major=$(sed -n 's:.*<ThixInstallMajor>\(.*\)</ThixInstallMajor>.*:\1:p' Directory.Build.props)
+          minor=$(sed -n 's:.*<ThixInstallMinor>\(.*\)</ThixInstallMinor>.*:\1:p' Directory.Build.props)
+          case "$channel" in
+            release) version="${major}.${minor}.${build}-${date}" ;;
+            nightly) version="nightly-${build}-${date}" ;;
+            *)       version="local-${date}" ;;
+          esac
+          {
+            echo "channel=$channel"
+            echo "date=$date"
+            echo "build=$build"
+            echo "version=$version"
+            echo "props=-p:Channel=$channel -p:BuildNumber=$build -p:BuildDate=$date"
+          } >> "$GITHUB_OUTPUT"
+          printf '### ThixInstall (Desktop)\n\n- version: `%s`\n- channel: `%s`\n' "$version" "$channel" >> "$GITHUB_STEP_SUMMARY"
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore tests/ThixInstall.Tests/ThixInstall.Tests.csproj
+
+      - name: Build
+        run: dotnet build tests/ThixInstall.Tests/ThixInstall.Tests.csproj -c Release --no-restore ${{ needs.version.outputs.props }}
+
+      # Business layer, sync against an in-memory cloud and the UI rendered headless. The end-to-end test against a
+      # running cloud needs THIXINSTALL_CLOUD_URL and is skipped here.
+      - name: Test
+        run: dotnet test tests/ThixInstall.Tests/ThixInstall.Tests.csproj -c Release --no-build --logger GitHubActions
+        env:
+          THIXINSTALL_SCREENSHOTS: ${{ github.workspace }}/screenshots
+
+      - name: Publish (win-x64, self-contained single file)
+        run: dotnet publish src/ThixInstall/ThixInstall.csproj -c Release -r win-x64 -o publish ${{ needs.version.outputs.props }}
+
+      # The published program is trimmed: it checks itself (SelfTest.cs) – JSON of settings, contract and jobs, the bundle
+      # ticket, the token store, the installed apps, shortcuts (COM) and every window – before anybody downloads it.
+      - name: Self test of the published program
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $process = Start-Process -FilePath publish\ThixInstall.exe -ArgumentList '--self-test', "$PWD\self-test.txt" -Wait -PassThru
+          if (Test-Path self-test.txt) { Get-Content self-test.txt } else { Write-Host 'no report written' }
+          if ($process.ExitCode -ne 0) { throw "self test failed (exit code $($process.ExitCode))" }
+
+      # ThixInstall.exe is its own setup (InstallService): started from the download it installs itself for the computer
+      # (program folder + service "ThixInstall Agent"), "--update" is the silent update, "--uninstall" the uninstaller.
+      # No installer tool needed. The cloud hands the same file out as a bundle (with a ticket appended).
+      - name: Package setup
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          Copy-Item publish\ThixInstall.exe artifacts\ThixInstallSetup.exe
+          Get-Item artifacts\ThixInstallSetup.exe | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: artifacts/
+          retention-days: 2
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-windows
+          path: screenshots/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  macos:
+    needs: version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore tests/ThixInstall.Tests/ThixInstall.Tests.csproj
+
+      - name: Build
+        run: dotnet build tests/ThixInstall.Tests/ThixInstall.Tests.csproj -c Release --no-restore ${{ needs.version.outputs.props }}
+
+      # The same tests as on Windows, here with the macOS parts (Homebrew casks, app bundles, Keychain, LaunchAgent).
+      - name: Test
+        run: dotnet test tests/ThixInstall.Tests/ThixInstall.Tests.csproj -c Release --no-build --logger GitHubActions
+        env:
+          THIXINSTALL_SCREENSHOTS: ${{ github.workspace }}/screenshots
+
+      - name: Publish and package (arm64 and x64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/package-macos.sh
+          for rid in osx-arm64 osx-x64; do
+            dotnet publish src/ThixInstall/ThixInstall.csproj -c Release -r "$rid" -o "publish/$rid" ${{ needs.version.outputs.props }}
+            scripts/package-macos.sh "publish/$rid" "$rid" "${{ needs.version.outputs.version }}" "${{ needs.version.outputs.build }}" artifacts
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: artifacts/
+          retention-days: 2
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-macos
+          path: screenshots/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  publish:
+    needs: [version, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows
+          path: artifacts
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos
+          path: artifacts
+
+      # The manifest the installed application reads for its update check (UpdateService): "setup"/"sha256" for
+      # Windows, "packages" for each platform.
+      - name: Write update manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts
+          sha() { sha256sum "$1" | cut -d' ' -f1; }
+          cat > thixinstall-update.json <<JSON
+          {
+            "version": "${{ needs.version.outputs.version }}",
+            "channel": "${{ needs.version.outputs.channel }}",
+            "buildNumber": ${{ needs.version.outputs.build }},
+            "setup": "ThixInstallSetup.exe",
+            "sha256": "$(sha ThixInstallSetup.exe)",
+            "publishedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "packages": {
+              "win-x64": { "file": "ThixInstallSetup.exe", "sha256": "$(sha ThixInstallSetup.exe)" },
+              "osx-arm64": { "file": "ThixInstall-macOS-arm64.zip", "sha256": "$(sha ThixInstall-macOS-arm64.zip)" },
+              "osx-x64": { "file": "ThixInstall-macOS-x64.zip", "sha256": "$(sha ThixInstall-macOS-x64.zip)" }
+            }
+          }
+          JSON
+          cat thixinstall-update.json
+          ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ThixInstall-${{ needs.version.outputs.version }}
+          path: artifacts/
+          retention-days: 30
+
+      # One rolling release per channel; each build replaces its files. The packages go up BEFORE the manifest,
+      # so an installation never reads a manifest whose package is not there yet.
+      - name: Publish to the update channel
+        if: github.event_name == 'push' && needs.version.outputs.channel != 'local'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          channel="${{ needs.version.outputs.channel }}"
+          version="${{ needs.version.outputs.version }}"
+          tag="${channel}-channel"
+          if [ "$channel" = "release" ]; then prerelease=""; title="ThixInstall (Release-Kanal)"; else prerelease="--prerelease"; title="ThixInstall (Nightly-Kanal)"; fi
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --target "$GITHUB_SHA" --title "$title" $prerelease \
+              --notes "Neuester Build des Kanals ${channel}. Windows: ThixInstallSetup.exe installiert oder aktualisiert ThixInstall. macOS: ThixInstall-macOS-arm64.dmg (Apple Silicon) bzw. -x64.dmg (Intel) öffnen und ThixInstall in „Programme“ ziehen. Installierte Versionen aktualisieren sich von hier aus selbst."
+          fi
+          gh release upload "$tag" artifacts/ThixInstallSetup.exe artifacts/ThixInstall-macOS-*.zip artifacts/ThixInstall-macOS-*.dmg --clobber
+          gh release upload "$tag" artifacts/thixinstall-update.json --clobber
+          gh release edit "$tag" --title "$title – $version"
+          echo "Published $version to $tag"
+
+      - name: Versioned release
+        if: github.event_name == 'push' && needs.version.outputs.channel == 'release'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          version="${{ needs.version.outputs.version }}"
+          cd artifacts
+          cp ThixInstallSetup.exe "ThixInstallSetup-${version}.exe"
+          for arch in arm64 x64; do cp "ThixInstall-macOS-${arch}.dmg" "ThixInstall-${version}-macOS-${arch}.dmg"; done
+          gh release create "v${version}" --target "$GITHUB_SHA" --title "ThixInstall ${version}" --generate-notes \
+            "ThixInstallSetup-${version}.exe" "ThixInstall-${version}-macOS-arm64.dmg" "ThixInstall-${version}-macOS-x64.dmg"

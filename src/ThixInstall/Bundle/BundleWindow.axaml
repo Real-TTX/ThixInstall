@@ -1,0 +1,75 @@
+<local:ThemedWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="using:ThixInstall"
+                    xmlns:controls="using:ThixInstall.Controls"
+                    x:Class="ThixInstall.Bundle.BundleWindow"
+                    Title="ThixInstall" Width="600" Height="640" MinWidth="440" MinHeight="420"
+                    WindowStartupLocation="CenterScreen">
+  <!--
+    The bundle runner: the selection of the start page of the cloud, installed one after the other without questions.
+    Every step shows its state; at the end a summary, and with a bundle "mit ThixInstall" the installed app takes over.
+  -->
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Background="{DynamicResource HeaderBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
+            Padding="26,18">
+      <Grid ColumnDefinitions="Auto,*">
+        <Image Source="/Assets/logo-64.png" Width="44" Height="44" RenderOptions.BitmapInterpolationMode="HighQuality" />
+        <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center" Spacing="2">
+          <TextBlock FontSize="22" FontWeight="SemiBold">
+            <Run Text="Thix" /><Run Text="Install" Foreground="{DynamicResource AccentBrush}" />
+          </TextBlock>
+          <TextBlock x:Name="BundleName" Theme="{StaticResource MutedText}" TextTrimming="CharacterEllipsis" Text="Paket wird geladen …" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0"
+            Padding="26,14">
+      <StackPanel Spacing="10">
+        <ProgressBar x:Name="TotalProgress" Height="6" MinHeight="6" Minimum="0" Maximum="100" />
+        <DockPanel>
+          <controls:ActionBar DockPanel.Dock="Right">
+            <Button x:Name="DoneButton" Theme="{StaticResource PrimaryButton}" Click="OnDoneClick" IsVisible="False" IsDefault="True">
+              <controls:IconLabel Icon="{StaticResource Icon.Check}" Text="Fertig" />
+            </Button>
+            <Button x:Name="CancelButton" Click="OnCancelClick" IsCancel="True">
+              <controls:IconLabel Icon="{StaticResource Icon.Stop}" Text="Abbrechen" />
+            </Button>
+          </controls:ActionBar>
+          <TextBlock x:Name="SummaryText" VerticalAlignment="Center" Theme="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,0,12,0" />
+        </DockPanel>
+      </StackPanel>
+    </Border>
+
+    <Panel>
+      <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="26,18,26,18">
+          <controls:InfoBar x:Name="Message" />
+          <ItemsControl x:Name="Steps">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="2,11">
+                  <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                    <Panel Grid.RowSpan="2" VerticalAlignment="Top">
+                      <controls:AppIcon Size="38" NameText="{Binding Name}" Key="{Binding Key}" Image="{Binding Icon}" IsVisible="{Binding IsApp}" />
+                      <Border Width="38" Height="38" CornerRadius="9" Background="{DynamicResource AccentSoftBrush}" IsVisible="{Binding !IsApp}">
+                        <controls:IconView Data="{Binding GlyphData}" Width="19" Height="19" Foreground="{DynamicResource AccentTextBrush}" />
+                      </Border>
+                    </Panel>
+                    <StackPanel Grid.Column="1" Margin="14,0,10,0" Spacing="2" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding StatusText}" Theme="{StaticResource FaintText}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <controls:StatusChip Grid.Column="2" Text="{Binding ShortState}" Tone="{Binding StateTone}" VerticalAlignment="Center" />
+                    <ProgressBar Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Height="4" MinHeight="4" Margin="14,8,0,0"
+                                 IsVisible="{Binding IsRunning}" IsIndeterminate="{Binding !HasProgress}" Value="{Binding ProgressValue}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </ScrollViewer>
+    </Panel>
+  </DockPanel>
+</local:ThemedWindow>

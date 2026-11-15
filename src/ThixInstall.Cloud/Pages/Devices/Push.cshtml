@@ -1,0 +1,32 @@
+@page "/Devices/Push"
+@model ThixInstall.Cloud.Pages.Devices.PushModel
+@{
+    ViewData["Title"] = "Auftrag senden";
+    ViewData["PageSub"] = $"An {Model.TargetName}";
+    ViewData["Crumbs"] = Model.ForProfile
+        ? new List<(string, string?)> { ("Katalog", null), ("Profile", "/Profiles"), (Model.TargetName, Model.BackUrl), ("Auftrag senden", null) }
+        : new List<(string, string?)> { ("Verwaltung", null), ("Geräte", "/Devices"), (Model.TargetName, Model.BackUrl), ("Auftrag senden", null) };
+    ViewData["Width"] = "narrow";
+}
+
+@if (Model.ForProfile)
+{
+    <div class="mat-seg ti-seg-gap" role="group" aria-label="System">
+        <a class="mat-seg__btn" href="/Devices/Push?profile=@Model.ProfileId" aria-pressed="@(Model.TargetOs == TargetOs.Windows ? "true" : "false")">@Ui.Icon("windows")<span>Windows-Geräte</span></a>
+        <a class="mat-seg__btn" href="/Devices/Push?profile=@Model.ProfileId&amp;os=macos" aria-pressed="@(Model.TargetOs == TargetOs.MacOS ? "true" : "false")">@Ui.Icon("apple")<span>Mac-Geräte</span></a>
+    </div>
+}
+
+<form class="mat-form" method="post" novalidate>
+    <partial name="_FormSummary" model="ViewData.ModelState" />
+    <input type="hidden" name="os" value="@ApiContract.ToQuery(Model.TargetOs)" />
+    <div class="mat-card">
+        <div class="mat-card__body mat-form">
+            <ti-field name="Kind" kind="select" label="Was soll passieren?" value="@Model.Kind" options="PushModel.Kinds" required />
+            <ti-field name="PackageId" kind="select" label="App" value="@Model.PackageId" options="Model.Packages" show-if="Kind" show-value="Install,Update,Uninstall" required msg-required="Bitte eine App wählen." />
+            <ti-field name="ScriptId" kind="select" label="Skript" value="@Model.ScriptId" options="Model.Scripts" show-if="Kind" show-value="RunScript" required msg-required="Bitte ein Skript wählen." />
+            <p class="mat-hint">@(Model.ForProfile ? "Geht an jedes Gerät des Profils mit Sync und diesem System." : "Das Gerät holt den Auftrag sofort ab, wenn es online ist, sonst beim nächsten Start.")</p>
+        </div>
+    </div>
+    <ti-buttons save="Senden" save-icon="rocket" back="@Model.BackUrl" />
+</form>

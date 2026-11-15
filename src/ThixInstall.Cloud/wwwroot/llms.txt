@@ -1,0 +1,25 @@
+# ThixInstall.Cloud
+
+> ThixInstall.Cloud is the self-hosted server of ThixInstall, an alternative to Ninite for Windows and macOS. On its start page anybody ticks the apps and scripts they want and downloads one program that installs all of them silently (the newest versions, no toolbars, no "Next" clicks). With an account, ThixInstall itself can be installed too: the computer then enrolls in the cloud, shows updates, installs from the catalog and, with "Sync" on, runs actions sent from the cloud (a simple device management). The interface is German.
+
+The packages come from winget (Windows), Chocolatey (Windows) and Homebrew (macOS) or from a direct download. The cloud resolves the newest version and the silent installer of each package and keeps the installers in its own download cache.
+
+## What a visitor can do
+
+- [Start page](/): pick apps and scripts for Windows or macOS, create a bundle, download it (Windows: one .exe; macOS: a zip with the app and the bundle).
+
+## What a signed-in person can do
+
+- Devices: see every enrolled computer with its installed apps and available updates; send actions (install, update, uninstall, run a script, update everything); give it a profile; remove it.
+- Actions: the history of every device with state and output; cancel waiting actions.
+- Bundles: the bundles made, their download pages and links.
+- Administrators: the catalog (apps with their winget/Chocolatey/Homebrew sources, scripts for PowerShell, Cmd, Bash and Zsh), profiles with enrollment keys for auto-enrollment, accounts, the download cache, settings.
+
+## The API (for the ThixInstall desktop app and the bundle program)
+
+JSON under `/api/v1`: `GET /api/v1/catalog?os=windows|macos&arch=x64|arm64` (public items without a token), `GET /api/v1/bundles/{token}`, `GET /api/v1/downloads/{releaseId}` (cached installers), `POST /api/v1/devices/enroll` (password, profile enrollment key or bundle token); with the device token: `GET/PUT /api/v1/device`, `PUT /api/v1/device/inventory`, `GET /api/v1/device/actions/wait?since=` (long poll), `GET /api/v1/device/actions`, `POST /api/v1/device/actions/{id}/start|finish`, `POST /api/v1/device/actions/report`.
+
+## Links
+
+- [Sign in](/Account/Login)
+- [Desktop app and releases](https://github.com/Real-TTX/ThixInstall/releases)

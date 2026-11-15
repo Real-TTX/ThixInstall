@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="mat-sprite" width="0" height="0" aria-hidden="true" focusable="false">
+  <!-- The icons only ThixInstall has, drawn like the toolkit's (24 x 24, a line of 2, round ends; the colour is the text colour). -->
+  <symbol id="mat-i-windows" viewBox="0 0 24 24"><path d='M3 5.5 10.5 4.5v7H3z'/><path d='M13 4.2 21 3v8.5h-8z'/><path d='M3 13.5h7.5v6.9L3 19.4z'/><path d='M13 13.5h8V21l-8-1.1z'/></symbol>
+  <symbol id="mat-i-apple" viewBox="0 0 24 24"><path d='M12 6.528V3a1 1 0 0 1 1-1'/><path d='M18.237 21A15 15 0 0 0 22 11a6 6 0 0 0-10-4.472A6 6 0 0 0 2 11a15.1 15.1 0 0 0 3.763 10 3 3 0 0 0 3.648.648 5.5 5.5 0 0 1 5.178 0A3 3 0 0 0 18.237 21'/></symbol>
+</svg>

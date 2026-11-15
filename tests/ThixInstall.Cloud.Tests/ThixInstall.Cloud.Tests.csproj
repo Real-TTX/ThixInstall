@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tests of ThixInstall.Cloud. The unit tests need nothing; the tests of the business layer and the API need PostgreSQL:
+    they run when THIXINSTALL_TEST_DB names a server (a connection string with the right to create databases), else they are skipped.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+    <PackageReference Include="xunit" Version="2.*" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.*" />
+    <PackageReference Include="GitHubActionsTestLogger" Version="2.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ThixInstall.Cloud\ThixInstall.Cloud.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,9 @@
+# ThixInstall.Cloud - a self-hosted catalog of apps for Windows and macOS. The start page (the catalog) may be indexed;
+# everything behind the sign-in, the bundles (their links are secrets) and the API are not for search engines.
+User-agent: *
+Allow: /$
+Allow: /llms.txt
+Allow: /robots.txt
+Disallow: /
+
+# Information for language models: /llms.txt
