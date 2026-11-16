@@ -71,7 +71,8 @@ public sealed class UiTests
         Settle(window);
 
         install.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-        WaitUntil(window, () => JobService.All().Any(job => job.Package?.Key == "git"));
+        // The job exists before the page's continuation clears the choice on the UI thread: wait for both.
+        WaitUntil(window, () => JobService.All().Any(job => job.Package?.Key == "git") && !git.IsSelected);
         Assert.Contains(JobService.All(), job => job is { Kind: ActionKind.Install, Origin: ActionOrigin.Device } && job.Package!.Key == "git");
         Assert.False(git.IsSelected, "a queued app is no longer chosen");
         window.IsExiting = true;
