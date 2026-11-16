@@ -27,17 +27,33 @@
 
 <div class="mat-card ti-download">
     <div class="mat-card__body">
-        <div class="ti-download__buttons">
-            @if (b.Os == TargetOs.Windows)
-            {
-                <a class="mat-btn mat-btn--primary mat-btn--lg" href="@Model.DownloadUrl("win-x64")" download>@Ui.Icon("windows")<span>Für Windows herunterladen</span></a>
-            }
-            else
-            {
-                <a class="mat-btn mat-btn--primary mat-btn--lg" href="@Model.DownloadUrl("osx-arm64")" download>@Ui.Icon("apple")<span>Für Mac mit Apple-Chip</span></a>
-                <a class="mat-btn mat-btn--secondary mat-btn--lg" href="@Model.DownloadUrl("osx-x64")" download>@Ui.Icon("apple")<span>Für Mac mit Intel-Chip</span></a>
-            }
-        </div>
+        @* No "download" attribute: the server sends the program as attachment anyway, and when it cannot (it redirects back here with
+           the error) the browser must show this page instead of saving it as an .htm file. *@
+        @if (Model.Available.Count == 0)
+        {
+            <div class="mat-alert mat-alert--warning" role="status">
+                @Ui.Icon("alert")
+                <div class="mat-alert__body">Das ThixInstall-Programm für @Ui.OsName(b.Os) ist in dieser Cloud noch nicht vorhanden – das Paket kann darum gerade nicht heruntergeladen werden.
+                    @(Model.SignedIn ? "Ein Administrator kann es unter Einstellungen › Desktop-App hochladen." : "Bitte später noch einmal versuchen.")</div>
+            </div>
+        }
+        else
+        {
+            <div class="ti-download__buttons">
+                @if (Model.Available.Contains("win-x64"))
+                {
+                    <a class="mat-btn mat-btn--primary mat-btn--lg" href="@Model.DownloadUrl("win-x64")">@Ui.Icon("windows")<span>Für Windows herunterladen</span></a>
+                }
+                @if (Model.Available.Contains("osx-arm64"))
+                {
+                    <a class="mat-btn mat-btn--primary mat-btn--lg" href="@Model.DownloadUrl("osx-arm64")">@Ui.Icon("apple")<span>Für Mac mit Apple-Chip</span></a>
+                }
+                @if (Model.Available.Contains("osx-x64"))
+                {
+                    <a class="mat-btn mat-btn--secondary mat-btn--lg" href="@Model.DownloadUrl("osx-x64")">@Ui.Icon("apple")<span>Für Mac mit Intel-Chip</span></a>
+                }
+            </div>
+        }
         <ol class="ti-steps">
             @if (b.Os == TargetOs.Windows)
             {

@@ -98,6 +98,27 @@ public static class AgentService
         }
     }
 
+    /// <summary>
+    /// Whether the cloud has a program for the platform (an upload, or the manifest of the channel names one), without fetching it: the page of a
+    /// bundle offers only what it can hand out.
+    /// </summary>
+    public static async Task<bool> IsAvailableAsync(AppDbContext db, string platformKey, CancellationToken ct = default)
+    {
+        var platform = Platforms.FirstOrDefault(p => p.Key == platformKey);
+        if (platform.Key is null)
+        {
+            return false;
+        }
+
+        if (File.Exists(UploadPath(platform.Key, platform.Extension)))
+        {
+            return true;
+        }
+
+        var manifest = await ManifestAsync(db, ct);
+        return manifest?.Packages?.ContainsKey(platform.Key) == true || (platform.Key == "win-x64" && !string.IsNullOrEmpty(manifest?.Setup));
+    }
+
     /// <summary>The package of a platform: an upload first, else the file of the GitHub release (through the cache).</summary>
     public static async Task<Outcome<CachedFile>> PackageAsync(AppDbContext db, string platformKey, CancellationToken ct = default)
     {

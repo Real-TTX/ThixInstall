@@ -106,7 +106,11 @@ public sealed class ApiTests
 
         var page = await client.GetAsync(ApiContract.BundlePage(token));
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
-        Assert.Contains("Büro PC", await page.Content.ReadAsStringAsync());
+        var html = await page.Content.ReadAsStringAsync();
+        Assert.Contains("Büro PC", html);
+        // a plain link: with a "download" attribute the browser would save the error page of a failed download as an .htm file
+        Assert.Contains($"href=\"{ApiContract.BundleDownload(token)}?platform=win-x64\">", html);
+        Assert.DoesNotContain("noch nicht vorhanden", html);
 
         var download = await client.GetAsync(ApiContract.BundleDownload(token) + "?platform=win-x64");
         Assert.Equal(HttpStatusCode.OK, download.StatusCode);

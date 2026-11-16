@@ -19,6 +19,9 @@ public sealed class PublicModel : AppPageModel
 
     public string Link => $"{Request.Scheme}://{Request.Host}{Request.PathBase}{ApiContract.BundlePage(Bundle.Token)}";
 
+    /// <summary>The platforms of the bundle's system the cloud has a program for (only those get a download button).</summary>
+    public IReadOnlySet<string> Available { get; private set; } = new HashSet<string>();
+
     public string DownloadUrl(string platform) => ApiContract.BundleDownload(Bundle.Token) + "?platform=" + platform;
 
     public async Task<IActionResult> OnGetAsync()
@@ -30,6 +33,17 @@ public sealed class PublicModel : AppPageModel
         }
 
         Bundle = bundle;
+        var platforms = bundle.Os == TargetOs.Windows ? new[] { "win-x64" } : ["osx-arm64", "osx-x64"];
+        var available = new HashSet<string>();
+        foreach (var platform in platforms)
+        {
+            if (await AgentService.IsAvailableAsync(Db, platform, HttpContext.RequestAborted))
+            {
+                available.Add(platform);
+            }
+        }
+
+        Available = available;
         return Page();
     }
 }
