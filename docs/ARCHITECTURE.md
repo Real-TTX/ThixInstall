@@ -22,7 +22,7 @@ src/ThixInstall.Cloud    Server (Docker, Port 4955): Razor Pages + MatUi, API /a
 
 | Begriff | Bedeutung |
 |---|---|
-| **Paket (Package)** | Eine App im Katalog. Quellen je Betriebssystem: Windows `winget`-Id, `choco`-Id oder direkter Download; macOS Homebrew-Cask oder -Formel. |
+| **Paket (Package)** | Eine App im Katalog. Quellen je Betriebssystem: Windows `winget`-Id, Microsoft-Store-Id, `choco`-Id, direkter Download oder eine hochgeladene Datei; macOS Homebrew-Cask oder -Formel, direkter Download oder eine hochgeladene Datei. „App hinzufügen“ sucht in allen Quellen und legt die App mit einem Klick an. |
 | **Skript (Script)** | Ein „Makro“: PowerShell/Cmd (Windows) oder Bash/Zsh (macOS), Kontext *System* (Administratorrechte) oder *Benutzer*. |
 | **Bundle** | Die Auswahl von der Startseite (Token = Geheimnis). Download = **eine** ThixInstall-EXE, in der die ganze Konfiguration steckt (`BundleTicket`: Cloud, Token, Apps mit Installationsplänen, Skripte, Agent, Profil). |
 | **Gerät (Device)** | Ein Rechner mit installiertem ThixInstall, angemeldet an einem Konto (Token). |
@@ -42,14 +42,26 @@ src/ThixInstall.Cloud    Server (Docker, Port 4955): Razor Pages + MatUi, API /a
      unterstützt (zip/portable, exe ohne Silent-Schalter): Plan ohne Download → das Gerät ruft `winget install` auf.
    - **Homebrew-Cask**: `formulae.brew.sh/api/cask/<name>.json`: Version, URL, SHA-256, `.app`-Name (`artifacts`),
      dmg/zip/pkg. Intel-Macs nehmen die passende `variations`-URL.
-   - **Chocolatey**, **Homebrew-Formel**: nur die Kommandozeile (`choco install -y`, `brew install`), Version per Info.
-   - **Direkt**: URL + stille Parameter aus dem Katalog, SHA-256 optional.
+   - **Chocolatey**: die neueste Version aus dem Feed von community.chocolatey.org; installiert wird mit `choco install -y` (fehlt
+     Chocolatey, richtet das Gerät es ein). **Homebrew-Formel**: `brew install`, Version aus der API.
+   - **Microsoft Store**: Version (oft keine: die App aktualisiert sich selbst) und Paketfamilie aus dem Store-Manifest; das Gerät ruft
+     `winget install --id <Store-Id> --source msstore` als angemeldeter Benutzer auf (Store-Apps gehören einem Benutzer).
+   - **Direkt**: URL + stille Parameter aus dem Katalog, SHA-256 optional; macOS dmg/zip (mit dem Namen der App) oder pkg.
+   - **Eigene Datei**: ein Administrator lädt den Installer hoch (Windows msi/exe/msix, macOS dmg/pkg/zip, bis 2 GB); er liegt in
+     `/data/uploads` (nie von der Cache-Bereinigung entfernt) und wird wie ein Cache-Eintrag ausgeliefert. Version und Parameter gibt der
+     Administrator an.
 2. Der `InstallPlan` im Katalog zeigt auf `/api/v1/downloads/{releaseId}`. Beim ersten Abruf lädt die Cloud die
    Datei von der Quelle, prüft die SHA-256 und legt sie unter `/data/cache` ab; danach kommt sie aus dem Cache
    (LRU-Bereinigung bei Überschreiten der eingestellten Größe).
 3. Das Gerät lädt, prüft die SHA-256 und startet den Installer still; ohne Download-URL nimmt es den Paketmanager.
 
-Erkennung installierter Apps: Windows über „Installierte Apps“ (Registry Uninstall, HKLM 64/32 Bit und die Benutzer),
+**App hinzufügen**: die Cloud durchsucht winget (offizieller Index `source2.msix`, als SQLite in `/data/sources`), den Microsoft Store
+(Store-Dienst von winget), Chocolatey (OData-Feed) und Homebrew (vollständige Listen in `/data/sources`) parallel, schlägt je System einen
+Treffer und eine Kategorie vor und markiert, was schon im Katalog ist. Beim Anlegen kommen Name, Herausgeber, Beschreibung und Homepage aus den
+Quellen (winget: Locale-Manifest), das Icon von Chocolatey oder der Homepage; danach wird aufgelöst.
+
+Erkennung installierter Apps: Windows über „Installierte Apps“ (Registry Uninstall, HKLM 64/32 Bit und die Benutzer) bzw. bei Store-Apps (MSIX)
+über die Paketfamilie,
 macOS über `/Applications/<App>.app` (`CFBundleShortVersionString`) bzw. `brew list --versions`. Update verfügbar =
 `AppVersion.IsNewer(LatestVersion, installiert)`.
 
@@ -74,7 +86,7 @@ Geheimnis ist.
 |---|---|
 | `User` | Name, Anzeigename, E-Mail, Passwort-Hash, `IsAdmin` |
 | `UserSession` | Token, UserId, Ablauf (Browser-Anmeldung) |
-| `Package` | Key, Name, Publisher, Beschreibung, Kategorie, Homepage, Icon (bytea + Typ), `IsPublic`, `IsFeatured`, Sortierung; Windows: `WingetId`, `ChocoId`, `DirectUrl`, `DirectSilentArguments`, `DirectSha256`, `WindowsMethod`, `DetectDisplayName`; macOS: `BrewName`, `BrewIsCask`, `MacAppBundleName` |
+| `Package` | Key, Name, Publisher, Beschreibung, Kategorie, Homepage, Icon (bytea + Typ), `IsPublic`, `IsFeatured`, Sortierung; Windows: `WindowsMethod`, `WingetId`, `StoreId`, `StorePackageFamilyName`, `ChocoId`, `DirectUrl`, `DirectSilentArguments`, `DirectSha256`, `DirectVersion`, `WindowsUploadSha256`, `WindowsUploadFileName`, `DetectDisplayName`; macOS: `MacMethod`, `BrewName`, `MacDirectUrl`, `MacDirectSha256`, `MacDirectVersion`, `MacUploadSha256`, `MacUploadFileName`, `MacAppBundleName` |
 | `PackageRelease` | PackageId, Os, Architecture, Version, Method, InstallerUrl, Sha256, InstallerKind, SilentArguments, ProductCode, AppBundleName, FileName, Size, ResolvedDate, Error |
 | `Script` | Key, Name, Beschreibung, Kategorie, Os, Shell, Context, Content, TimeoutSeconds, `IsPublic` |
 | `Profile` | Name, Beschreibung, Os (optional), `EnrollmentKey` (Token) |

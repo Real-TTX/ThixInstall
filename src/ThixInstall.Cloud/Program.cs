@@ -43,9 +43,11 @@ builder.Services.AddScoped<CurrentUser>();
 builder.Services.AddHostedService<MaintenanceService>();
 builder.Services.AddHostedService<ResolverService>();
 
-// The download cache and the uploaded desktop packages live in the volume too.
+// The download cache, the uploaded desktop packages and installers, and the lists of the sources (search of "App hinzufügen") live in the volume too.
 ThixInstall.Cloud.Business.DownloadCache.UseDirectory(Path.Combine(dataDirectory, "cache"));
 ThixInstall.Cloud.Business.AgentService.UseDirectory(Path.Combine(dataDirectory, "agent"));
+ThixInstall.Cloud.Business.PackageUploads.UseDirectory(Path.Combine(dataDirectory, "uploads"));
+ThixInstall.Cloud.Business.SourceFiles.UseDirectory(Path.Combine(dataDirectory, "sources"));
 
 // The JSON of the API is the one of the contract (camelCase, enums as text, no nulls).
 builder.Services.ConfigureHttpJsonOptions(o =>
@@ -123,7 +125,8 @@ builder.Services.AddRateLimiter(o =>
     };
 });
 
-// Uploads: the desktop packages of an administrator (up to 400 MB) and package icons.
+// Uploads: the desktop packages of an administrator (up to 400 MB) and package icons. The installers of apps (up to 2 GB) raise the limit
+// for their page only (Catalog/Packages/Edit).
 var bodyLimit = ThixInstall.Cloud.Business.AgentService.MaxUploadBytes + 2 * 1024 * 1024;
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = bodyLimit);
 builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = bodyLimit);

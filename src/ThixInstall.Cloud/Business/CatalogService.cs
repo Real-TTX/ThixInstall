@@ -29,13 +29,21 @@ public sealed record PackageInput
     public InstallMethod? WindowsMethod { get; init; }
     public string? WingetId { get; init; }
     public string? ChocoId { get; init; }
+    public string? StoreId { get; init; }
+    public string? StorePackageFamilyName { get; init; }
     public string? DirectUrl { get; init; }
     public string? DirectSilentArguments { get; init; }
     public string? DirectSha256 { get; init; }
     public string? DirectVersion { get; init; }
+    /// <summary>The name of the uploaded Windows installer (shown; the file itself comes as <see cref="UploadFile"/>).</summary>
+    public string? WindowsUploadFileName { get; init; }
     public string? DetectDisplayName { get; init; }
     public InstallMethod? MacMethod { get; init; }
     public string? BrewName { get; init; }
+    public string? MacDirectUrl { get; init; }
+    public string? MacDirectSha256 { get; init; }
+    public string? MacDirectVersion { get; init; }
+    public string? MacUploadFileName { get; init; }
     public string? MacAppBundleName { get; init; }
     public bool HasIcon { get; init; }
     public DateTime? ResolvedDate { get; init; }
@@ -124,7 +132,12 @@ public static class CatalogService
         LatestVersion = release?.Method == (os == TargetOs.Windows ? p.WindowsMethod : p.MacMethod) ? release?.Version : null,
         Install = ReleaseService.Plan(p, release, os),
         Detection = os == TargetOs.Windows
-            ? new DetectionRule { DisplayName = string.IsNullOrWhiteSpace(p.DetectDisplayName) ? p.Name : p.DetectDisplayName, ProductCode = release?.ProductCode }
+            ? new DetectionRule
+            {
+                DisplayName = string.IsNullOrWhiteSpace(p.DetectDisplayName) ? p.Name : p.DetectDisplayName,
+                ProductCode = release?.ProductCode,
+                PackageFamilyName = p.WindowsMethod == InstallMethod.MicrosoftStore ? p.StorePackageFamilyName : null,
+            }
             : new DetectionRule
             {
                 AppBundleName = p.MacAppBundleName ?? release?.AppBundleName,
@@ -183,7 +196,8 @@ public static class CatalogService
             var pattern = "%" + UserService.EscapeLike(query.Search.Trim()) + "%";
             filtered = filtered.Where(p => EF.Functions.ILike(p.Name, pattern, "\\") || EF.Functions.ILike(p.Key, pattern, "\\")
                                            || EF.Functions.ILike(p.Publisher ?? "", pattern, "\\") || EF.Functions.ILike(p.WingetId ?? "", pattern, "\\")
-                                           || EF.Functions.ILike(p.BrewName ?? "", pattern, "\\"));
+                                           || EF.Functions.ILike(p.BrewName ?? "", pattern, "\\") || EF.Functions.ILike(p.ChocoId ?? "", pattern, "\\")
+                                           || EF.Functions.ILike(p.StoreId ?? "", pattern, "\\"));
         }
 
         if (!string.IsNullOrEmpty(query.Category))
@@ -260,9 +274,11 @@ public static class CatalogService
         {
             Id = p.Id, Key = p.Key, Name = p.Name, Publisher = p.Publisher, Description = p.Description, Category = p.Category, Homepage = p.Homepage,
             IsPublic = p.IsPublic, IsFeatured = p.IsFeatured, SortOrder = p.SortOrder, WindowsMethod = p.WindowsMethod, WingetId = p.WingetId, ChocoId = p.ChocoId,
+            StoreId = p.StoreId, StorePackageFamilyName = p.StorePackageFamilyName,
             DirectUrl = p.DirectUrl, DirectSilentArguments = p.DirectSilentArguments, DirectSha256 = p.DirectSha256, DirectVersion = p.DirectVersion,
-            DetectDisplayName = p.DetectDisplayName, MacMethod = p.MacMethod, BrewName = p.BrewName, MacAppBundleName = p.MacAppBundleName, HasIcon = hasIcon,
-            ResolvedDate = p.ResolvedDate,
+            WindowsUploadFileName = p.WindowsUploadFileName, DetectDisplayName = p.DetectDisplayName, MacMethod = p.MacMethod, BrewName = p.BrewName,
+            MacDirectUrl = p.MacDirectUrl, MacDirectSha256 = p.MacDirectSha256, MacDirectVersion = p.MacDirectVersion, MacUploadFileName = p.MacUploadFileName,
+            MacAppBundleName = p.MacAppBundleName, HasIcon = hasIcon, ResolvedDate = p.ResolvedDate,
         });
     }
 
@@ -329,8 +345,11 @@ public static class CatalogService
         return Outcome<long>.Success(package.Id);
     }
 
-    /// <summary>The tab "Windows": the source and how the installed app is recognised. Resolves the source at once.</summary>
-    public static async Task<Outcome<string>> SaveWindowsAsync(AppDbContext db, Actor actor, PackageInput input, CancellationToken ct = default)
+    /// <summary>
+    /// The tab "Windows": the source and how the installed app is recognised; <paramref name="upload"/> is a new installer for the source "Eigene
+    /// Datei". Resolves the source at once.
+    /// </summary>
+    public static async Task<Outcome<string>> SaveWindowsAsync(AppDbContext db, Actor actor, PackageInput input, UploadFile? upload = null, CancellationToken ct = default)
     {
         UserService.RequireAdmin(actor);
         var package = await db.Packages.FirstOrDefaultAsync(p => p.Id == input.Id, ct);
@@ -339,6 +358,7 @@ public static class CatalogService
             return Outcome<string>.Missing();
         }
 
+        StoredUpload? stored = null;
         switch (input.WindowsMethod)
         {
             case null:
@@ -350,10 +370,34 @@ public static class CatalogService
                 }
 
                 break;
+            case InstallMethod.MicrosoftStore:
+                if (!StoreSource.IsValidId(Text.Clean(input.StoreId, 40)))
+                {
+                    return Outcome<string>.Fail("Bitte die Store-Id angeben, z. B. 9NKSQGP7F2NH (aus der Adresse der App im Microsoft Store).", "StoreId");
+                }
+
+                break;
             case InstallMethod.Chocolatey:
-                if (Text.Clean(input.ChocoId, 200) is not { } choco || choco.Any(c => !(char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_')))
+                if (!ChocolateySource.IsValidId(Text.Clean(input.ChocoId, 200)))
                 {
                     return Outcome<string>.Fail("Bitte die Chocolatey-Id angeben (Buchstaben, Ziffern, . - _).", "ChocoId");
+                }
+
+                break;
+            case InstallMethod.Upload:
+                if (upload is not null)
+                {
+                    var saved = await PackageUploads.SaveAsync(upload, TargetOs.Windows, "WindowsFile", ct);
+                    if (!saved.Ok)
+                    {
+                        return Outcome<string>.Fail(saved.Error!, saved.Field);
+                    }
+
+                    stored = saved.Value;
+                }
+                else if (!Text.IsSha256(package.WindowsUploadSha256))
+                {
+                    return Outcome<string>.Fail("Bitte den Installer hochladen (.msi, .exe oder .msix).", "WindowsFile");
                 }
 
                 break;
@@ -373,20 +417,48 @@ public static class CatalogService
                 return Outcome<string>.Fail("Diese Quelle gibt es unter Windows nicht.", "WindowsMethod");
         }
 
+        var oldUpload = package.WindowsUploadSha256;
         package.WindowsMethod = input.WindowsMethod;
         package.WingetId = Text.Clean(input.WingetId, 200);
         package.ChocoId = Text.Clean(input.ChocoId, 200);
+        var storeId = Text.Clean(input.StoreId, 40)?.ToUpperInvariant();
+        if (storeId != package.StoreId)
+        {
+            // another app of the Store: its package family comes with the next resolve
+            package.StorePackageFamilyName = null;
+        }
+
+        package.StoreId = storeId;
         package.DirectUrl = Text.Clean(input.DirectUrl, 1000);
         package.DirectSilentArguments = Text.Clean(input.DirectSilentArguments, 500);
         package.DirectSha256 = Text.Clean(input.DirectSha256, 64)?.ToLowerInvariant();
         package.DirectVersion = Text.Clean(input.DirectVersion, 60);
         package.DetectDisplayName = Text.Clean(input.DetectDisplayName, 200);
+        if (stored is not null)
+        {
+            package.WindowsUploadSha256 = stored.Sha256;
+            package.WindowsUploadFileName = stored.FileName;
+        }
+        else if (input.WindowsMethod != InstallMethod.Upload)
+        {
+            // another source: the uploaded installer is not needed any more
+            package.WindowsUploadSha256 = null;
+            package.WindowsUploadFileName = null;
+        }
+
         await db.SaveChangesAsync(ct);
+        if (oldUpload is not null && oldUpload != package.WindowsUploadSha256)
+        {
+            await PackageUploads.DeleteIfUnusedAsync(db, oldUpload, ct);
+        }
+
         return await ResolveAfterSaveAsync(db, package.Id, ct);
     }
 
-    /// <summary>The tab "macOS": the Homebrew cask or formula. Resolves the source at once.</summary>
-    public static async Task<Outcome<string>> SaveMacAsync(AppDbContext db, Actor actor, PackageInput input, CancellationToken ct = default)
+    /// <summary>
+    /// The tab "macOS": a Homebrew cask or formula, a direct download or an uploaded installer (<paramref name="upload"/>). Resolves the source at once.
+    /// </summary>
+    public static async Task<Outcome<string>> SaveMacAsync(AppDbContext db, Actor actor, PackageInput input, UploadFile? upload = null, CancellationToken ct = default)
     {
         UserService.RequireAdmin(actor);
         var package = await db.Packages.FirstOrDefaultAsync(p => p.Id == input.Id, ct);
@@ -395,26 +467,99 @@ public static class CatalogService
             return Outcome<string>.Missing();
         }
 
-        if (input.MacMethod is not null and not InstallMethod.Homebrew and not InstallMethod.HomebrewCask)
-        {
-            return Outcome<string>.Fail("Diese Quelle gibt es unter macOS nicht.", "MacMethod");
-        }
-
-        if (input.MacMethod is not null && !BrewResolver.IsValidName(Text.Clean(input.BrewName, 200)))
-        {
-            return Outcome<string>.Fail("Bitte den Namen bei Homebrew angeben, z. B. firefox.", "BrewName");
-        }
-
         var appName = Text.Clean(input.MacAppBundleName, 200);
         if (appName is not null && (!appName.EndsWith(".app", StringComparison.OrdinalIgnoreCase) || appName.Contains('/')))
         {
             return Outcome<string>.Fail("Der Name der App endet auf .app, z. B. Firefox.app.", "MacAppBundleName");
         }
 
+        StoredUpload? stored = null;
+        switch (input.MacMethod)
+        {
+            case null:
+                break;
+            case InstallMethod.Homebrew or InstallMethod.HomebrewCask:
+                if (!BrewResolver.IsValidName(Text.Clean(input.BrewName, 200)))
+                {
+                    return Outcome<string>.Fail("Bitte den Namen bei Homebrew angeben, z. B. firefox.", "BrewName");
+                }
+
+                break;
+            case InstallMethod.Direct:
+                if (!Text.IsHttpUrl(input.MacDirectUrl))
+                {
+                    return Outcome<string>.Fail("Bitte die Adresse angeben (https://…/App.dmg).", "MacDirectUrl");
+                }
+
+                if (PackageUploads.KindOf(Text.FileNameOf(input.MacDirectUrl), TargetOs.MacOS) is null)
+                {
+                    return Outcome<string>.Fail("Die Adresse endet auf .dmg, .pkg oder .zip.", "MacDirectUrl");
+                }
+
+                if (Text.Clean(input.MacDirectSha256, 64) is { } sha && !Text.IsSha256(sha))
+                {
+                    return Outcome<string>.Fail("Die SHA-256 hat 64 Hex-Zeichen.", "MacDirectSha256");
+                }
+
+                if (appName is null && PackageUploads.KindOf(Text.FileNameOf(input.MacDirectUrl), TargetOs.MacOS) != InstallerKind.Pkg)
+                {
+                    return Outcome<string>.Fail("Bitte den Namen der App angeben, z. B. Firefox.app: ThixInstall kopiert sie aus dem Download nach /Programme.", "MacAppBundleName");
+                }
+
+                break;
+            case InstallMethod.Upload:
+                if (upload is null && !Text.IsSha256(package.MacUploadSha256))
+                {
+                    return Outcome<string>.Fail("Bitte den Installer hochladen (.dmg, .pkg oder .zip).", "MacFile");
+                }
+
+                // checked before the file is stored: a dmg or zip needs the name of the app inside
+                var kind = PackageUploads.KindOf(upload?.FileName ?? package.MacUploadFileName, TargetOs.MacOS);
+                if (appName is null && kind is not null && kind != InstallerKind.Pkg)
+                {
+                    return Outcome<string>.Fail("Bitte den Namen der App angeben, z. B. Firefox.app: ThixInstall kopiert sie aus der Datei nach /Programme.", "MacAppBundleName");
+                }
+
+                if (upload is not null)
+                {
+                    var saved = await PackageUploads.SaveAsync(upload, TargetOs.MacOS, "MacFile", ct);
+                    if (!saved.Ok)
+                    {
+                        return Outcome<string>.Fail(saved.Error!, saved.Field);
+                    }
+
+                    stored = saved.Value;
+                }
+
+                break;
+            default:
+                return Outcome<string>.Fail("Diese Quelle gibt es unter macOS nicht.", "MacMethod");
+        }
+
+        var oldUpload = package.MacUploadSha256;
         package.MacMethod = input.MacMethod;
-        package.BrewName = input.MacMethod is null ? Text.Clean(input.BrewName, 200) : Text.Clean(input.BrewName, 200);
+        package.BrewName = Text.Clean(input.BrewName, 200);
+        package.MacDirectUrl = Text.Clean(input.MacDirectUrl, 1000);
+        package.MacDirectSha256 = Text.Clean(input.MacDirectSha256, 64)?.ToLowerInvariant();
+        package.MacDirectVersion = Text.Clean(input.MacDirectVersion, 60);
         package.MacAppBundleName = appName;
+        if (stored is not null)
+        {
+            package.MacUploadSha256 = stored.Sha256;
+            package.MacUploadFileName = stored.FileName;
+        }
+        else if (input.MacMethod != InstallMethod.Upload)
+        {
+            package.MacUploadSha256 = null;
+            package.MacUploadFileName = null;
+        }
+
         await db.SaveChangesAsync(ct);
+        if (oldUpload is not null && oldUpload != package.MacUploadSha256)
+        {
+            await PackageUploads.DeleteIfUnusedAsync(db, oldUpload, ct);
+        }
+
         return await ResolveAfterSaveAsync(db, package.Id, ct);
     }
 
@@ -438,6 +583,8 @@ public static class CatalogService
         await db.BundleItems.Where(i => i.PackageId == id).ExecuteDeleteAsync(ct);
         db.Packages.Remove(package);
         await db.SaveChangesAsync(ct);
+        await PackageUploads.DeleteIfUnusedAsync(db, package.WindowsUploadSha256, ct);
+        await PackageUploads.DeleteIfUnusedAsync(db, package.MacUploadSha256, ct);
         return Outcome.Success();
     }
 

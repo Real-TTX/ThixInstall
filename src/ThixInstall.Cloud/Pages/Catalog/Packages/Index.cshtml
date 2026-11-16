@@ -2,7 +2,7 @@
 @model ThixInstall.Cloud.Pages.Catalog.Packages.IndexModel
 @{
     ViewData["Title"] = "Apps";
-    ViewData["PageSub"] = "Der Katalog: woher jede App kommt (winget, Chocolatey, Homebrew, direkter Download) und welche Version die Cloud kennt.";
+    ViewData["PageSub"] = "Der Katalog: woher jede App kommt (winget, Microsoft Store, Chocolatey, Homebrew, Download, eigene Datei) und welche Version die Cloud kennt.";
     ViewData["Crumbs"] = new List<(string, string?)> { ("Katalog", null), ("Apps", null) };
 }
 
@@ -13,8 +13,8 @@
     {
         var first = Model.Toolbar.Total == 0;
         <partial name="_Empty" model="@(new EmptyStateModel("box", first ? "Noch keine App" : "Nichts gefunden",
-            first ? "Lege die erste App an: Name, Kategorie und die Quelle für Windows und macOS." : "Keine App passt zur Suche oder zu den Filtern.",
-            first, "/Catalog/Packages/Edit", "Neue App", Model.Toolbar.UrlReset()))" />
+            first ? "Füge die erste App hinzu: Namen suchen, Quelle für Windows und macOS wählen – fertig." : "Keine App passt zur Suche oder zu den Filtern.",
+            first, "/Catalog/Packages/Add", "App hinzufügen", Model.Toolbar.UrlReset()))" />
     }
     else
     {
@@ -52,7 +52,8 @@
     <partial name="_Pager" model="Model.Pager" />
 
     <form method="post" class="mat-actions">
-        <a class="mat-btn mat-btn--primary" href="/Catalog/Packages/Edit">@Ui.Icon("plus")<span>Neue App</span></a>
+        <a class="mat-btn mat-btn--primary" href="/Catalog/Packages/Add">@Ui.Icon("plus")<span>App hinzufügen</span></a>
+        <a class="mat-btn mat-btn--secondary" href="/Catalog/Packages/Edit">@Ui.Icon("edit")<span>Manuell anlegen</span></a>
         <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="ResolveAll">@Ui.Icon("refresh")<span>Alle auflösen</span></button>
     </form>
 </div>

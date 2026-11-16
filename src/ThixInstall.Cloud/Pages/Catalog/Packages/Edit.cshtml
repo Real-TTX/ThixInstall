@@ -22,21 +22,25 @@
 @switch (Model.Tab)
 {
     case "windows":
-        <form class="mat-form" method="post" asp-page-handler="Windows" asp-route-id="@Model.Id" asp-route-tab="windows" novalidate>
+        <form class="mat-form" method="post" asp-page-handler="Windows" asp-route-id="@Model.Id" asp-route-tab="windows" enctype="multipart/form-data" novalidate>
             <partial name="_FormSummary" model="ViewData.ModelState" />
             <div class="mat-card">
                 <div class="mat-card__body mat-form">
                     <ti-field name="WindowsMethod" kind="radios" label="Quelle" value="@Model.WindowsMethod" options="EditModel.WindowsMethods" />
                     <ti-field name="WingetId" label="winget-Id" value="@Model.WingetId" mono required maxlength="200" placeholder="Mozilla.Firefox" show-if="WindowsMethod" show-value="Winget"
-                              hint="Wie bei „winget install --id“. Zu finden mit „winget search“ oder auf winget.run." msg-required="Bitte die winget-Id angeben." />
+                              hint="Wie bei „winget install --id“. Einfacher: „App hinzufügen“ in der Liste der Apps sucht sie für dich." msg-required="Bitte die winget-Id angeben." />
+                    <ti-field name="StoreId" label="Store-Id" value="@Model.StoreId" mono required maxlength="40" placeholder="9NKSQGP7F2NH" show-if="WindowsMethod" show-value="MicrosoftStore"
+                              hint="@(Model.StorePackageFamilyName is null ? "Die Id am Ende der Adresse der App im Microsoft Store (apps.microsoft.com/detail/…)." : $"Erkannt am Paket {Model.StorePackageFamilyName}.")" msg-required="Bitte die Store-Id angeben." />
                     <ti-field name="ChocoId" label="Chocolatey-Id" value="@Model.ChocoId" mono maxlength="200" placeholder="firefox" show-if="WindowsMethod" show-value="Chocolatey,Winget"
                               hint="Für Chocolatey: der Name bei community.chocolatey.org. Bei winget nur zur Information." />
                     <ti-field name="DirectUrl" kind="url" label="Adresse des Installers" value="@Model.DirectUrl" mono required maxlength="1000" placeholder="https://…/setup.exe" show-if="WindowsMethod" show-value="Direct" msg-required="Bitte die Adresse angeben." />
-                    <ti-field name="DirectSilentArguments" label="Parameter für die stille Installation" value="@Model.DirectSilentArguments" mono maxlength="500" placeholder="/S" show-if="WindowsMethod" show-value="Direct"
+                    <ti-field name="WindowsFile" kind="file" label="@(Model.WindowsUploadFileName is null ? "Installer" : "Neuer Installer")" optional="@(Model.WindowsUploadFileName is not null)" accept=".msi,.exe,.msix,.msixbundle,.appx,.appxbundle" max-size="2GB" show-if="WindowsMethod" show-value="Upload"
+                              hint="@(Model.WindowsUploadFileName is null ? "MSI, EXE oder MSIX bis 2 GB. Die Cloud hält die Datei und liefert sie an die Geräte." : $"Hochgeladen: {Model.WindowsUploadFileName}. Eine neue Datei ersetzt sie.")" />
+                    <ti-field name="DirectSilentArguments" label="Parameter für die stille Installation" value="@Model.DirectSilentArguments" mono maxlength="500" placeholder="/S" show-if="WindowsMethod" show-value="Direct,Upload"
                               hint="Bei einer .msi leer lassen: /qn /norestart." />
                     <ti-field name="DirectSha256" label="SHA-256" optional value="@Model.DirectSha256" mono maxlength="64" show-if="WindowsMethod" show-value="Direct" hint="Wenn angegeben, prüft die Cloud den Download." />
-                    <ti-field name="DirectVersion" label="Version" optional value="@Model.DirectVersion" maxlength="60" show-if="WindowsMethod" show-value="Direct" hint="Für die Anzeige von Updates." />
-                    <ti-field name="DetectDisplayName" label="Erkennen an (Name unter „Installierte Apps“)" optional value="@Model.DetectDisplayName" maxlength="200" placeholder="@Model.Name" show-if="WindowsMethod" show-value="Winget,Chocolatey,Direct"
+                    <ti-field name="DirectVersion" label="Version" optional value="@Model.DirectVersion" maxlength="60" show-if="WindowsMethod" show-value="Direct,Upload" hint="Für die Anzeige von Updates: bei einer neuen Datei die Version erhöhen." />
+                    <ti-field name="DetectDisplayName" label="Erkennen an (Name unter „Installierte Apps“)" optional value="@Model.DetectDisplayName" maxlength="200" placeholder="@Model.Name" show-if="WindowsMethod" show-value="Winget,MicrosoftStore,Chocolatey,Direct,Upload"
                               hint="Der Anfang des Namens, z. B. „Mozilla Firefox“. Mit ^ am Anfang ein regulärer Ausdruck. Leer: der Name der App." />
                 </div>
             </div>
@@ -45,15 +49,21 @@
         break;
 
     case "macos":
-        <form class="mat-form" method="post" asp-page-handler="Mac" asp-route-id="@Model.Id" asp-route-tab="macos" novalidate>
+        <form class="mat-form" method="post" asp-page-handler="Mac" asp-route-id="@Model.Id" asp-route-tab="macos" enctype="multipart/form-data" novalidate>
             <partial name="_FormSummary" model="ViewData.ModelState" />
             <div class="mat-card">
                 <div class="mat-card__body mat-form">
                     <ti-field name="MacMethod" kind="radios" label="Quelle" value="@Model.MacMethod" options="EditModel.MacMethods" />
                     <ti-field name="BrewName" label="Name bei Homebrew" value="@Model.BrewName" mono required maxlength="200" placeholder="firefox" show-if="MacMethod" show-value="HomebrewCask,Homebrew"
                               hint="Wie bei „brew install --cask firefox“ bzw. „brew install git“. Zu finden auf formulae.brew.sh." msg-required="Bitte den Namen angeben." />
-                    <ti-field name="MacAppBundleName" label="Name der App" optional value="@Model.MacAppBundleName" maxlength="200" placeholder="Firefox.app" show-if="MacMethod" show-value="HomebrewCask"
-                              hint="Woran ThixInstall die installierte App in /Programme erkennt. Leer: was der Cask nennt." />
+                    <ti-field name="MacDirectUrl" kind="url" label="Adresse des Installers" value="@Model.MacDirectUrl" mono required maxlength="1000" placeholder="https://…/App.dmg" show-if="MacMethod" show-value="Direct"
+                              hint="Eine .dmg oder .zip mit der App, oder eine .pkg. Die Cloud lädt sie einmal und hält sie im Cache." msg-required="Bitte die Adresse angeben." />
+                    <ti-field name="MacDirectSha256" label="SHA-256" optional value="@Model.MacDirectSha256" mono maxlength="64" show-if="MacMethod" show-value="Direct" hint="Wenn angegeben, prüft die Cloud den Download." />
+                    <ti-field name="MacFile" kind="file" label="@(Model.MacUploadFileName is null ? "Installer" : "Neuer Installer")" optional="@(Model.MacUploadFileName is not null)" accept=".dmg,.pkg,.zip" max-size="2GB" show-if="MacMethod" show-value="Upload"
+                              hint="@(Model.MacUploadFileName is null ? "DMG, PKG oder ZIP bis 2 GB. Die Cloud hält die Datei und liefert sie an die Geräte." : $"Hochgeladen: {Model.MacUploadFileName}. Eine neue Datei ersetzt sie.")" />
+                    <ti-field name="MacDirectVersion" label="Version" optional value="@Model.MacDirectVersion" maxlength="60" show-if="MacMethod" show-value="Direct,Upload" hint="Für die Anzeige von Updates: bei einer neuen Datei die Version erhöhen." />
+                    <ti-field name="MacAppBundleName" label="Name der App" optional value="@Model.MacAppBundleName" maxlength="200" placeholder="Firefox.app" show-if="MacMethod" show-value="HomebrewCask,Direct,Upload"
+                              hint="Woran ThixInstall die installierte App in /Programme erkennt. Beim Cask leer: was der Cask nennt; bei dmg und zip nötig." />
                 </div>
             </div>
             <ti-buttons save="Speichern und auflösen" save-icon="refresh" back="/Catalog/Packages" delete-handler="Delete" delete-confirm="@deleteConfirm" />
@@ -88,7 +98,7 @@
                                     @if (r.Note is not null) { <small class="mat-muted ti-block">@r.Note</small> }
                                     @if (r.Error is not null) { <small class="ti-error-text">@r.Error</small> }
                                 </td>
-                                <td data-label="Cache" class="mat-hide-sm">@if (r.InstallerUrl is null) { <span class="mat-muted">–</span> } else if (r.IsCached) { <span class="mat-pill mat-pill--ok">Im Cache</span> } else { <span class="mat-pill mat-pill--plain">Beim ersten Abruf</span> }</td>
+                                <td data-label="Cache" class="mat-hide-sm">@if (r.InstallerUrl is null) { <span class="mat-muted">–</span> } else if (r.IsUpload) { <span class="mat-pill mat-pill--ok">Hochgeladen</span> } else if (r.IsCached) { <span class="mat-pill mat-pill--ok">Im Cache</span> } else { <span class="mat-pill mat-pill--plain">Beim ersten Abruf</span> }</td>
                                 <td data-label="Aufgelöst" class="mat-hide-md">@Dates.Stamp(r.ResolvedDate)</td>
                             </tr>
                         }

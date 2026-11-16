@@ -6,11 +6,12 @@ namespace ThixInstall.Cloud.Business;
 
 /// <summary>One resolved release as the "Versionen" tab shows it.</summary>
 public sealed record ReleaseView(long Id, TargetOs Os, CpuArchitecture Architecture, InstallMethod Method, string? Version, string? InstallerUrl, string? Sha256,
-    InstallerKind? Kind, string? SilentArguments, string? FileName, DateTime ResolvedDate, string? Error, string? Note, bool IsCached);
+    InstallerKind? Kind, string? SilentArguments, string? FileName, DateTime ResolvedDate, string? Error, string? Note, bool IsCached, bool IsUpload);
 
 /// <summary>
 /// Resolves the sources of the packages into releases (<see cref="PackageRelease"/>), one per system and architecture: winget and Homebrew through their
-/// resolvers, Chocolatey as a plan for the command line, a direct download as it is. Runs every six hours for every package (<see cref="DueAsync"/>), at once
+/// resolvers, the Microsoft Store and Chocolatey as a plan for the command line (with the version their services name), a direct download and an
+/// uploaded installer as they are. Runs every six hours for every package (<see cref="DueAsync"/>), at once
 /// after a package was saved, and by the button "Jetzt auflösen". A failure keeps the last release and writes its message into it.
 /// </summary>
 public static class ReleaseService
@@ -158,20 +159,98 @@ public static class ReleaseService
             case InstallMethod.Winget when !string.IsNullOrWhiteSpace(package.WingetId):
                 return await WingetResolver.ResolveAsync(package.WingetId!, gitHubToken, ct);
             case InstallMethod.Chocolatey when !string.IsNullOrWhiteSpace(package.ChocoId):
-                var choco = new ResolvedRelease(InstallMethod.Chocolatey, null);
-                return new Dictionary<CpuArchitecture, ResolvedRelease> { [CpuArchitecture.X64] = choco, [CpuArchitecture.Arm64] = choco };
+                return Both(await ChocolateyAsync(package, ct));
+            case InstallMethod.MicrosoftStore when !string.IsNullOrWhiteSpace(package.StoreId):
+                return Both(await StoreAsync(package, ct));
             case InstallMethod.Direct when Text.IsHttpUrl(package.DirectUrl):
-                var direct = Direct(package);
-                return new Dictionary<CpuArchitecture, ResolvedRelease> { [CpuArchitecture.X64] = direct, [CpuArchitecture.Arm64] = direct };
+                return Both(Direct(package));
+            case InstallMethod.Upload when Text.IsSha256(package.WindowsUploadSha256):
+                return Both(Upload(package.WindowsUploadSha256!, package.WindowsUploadFileName, TargetOs.Windows, package.DirectVersion,
+                    package.DirectSilentArguments, null));
             default:
                 return null;
         }
     }
 
     private static async Task<IReadOnlyDictionary<CpuArchitecture, ResolvedRelease>?> MacAsync(Package package, CancellationToken ct)
-        => package.MacMethod is InstallMethod.HomebrewCask or InstallMethod.Homebrew && !string.IsNullOrWhiteSpace(package.BrewName)
-            ? await BrewResolver.ResolveAsync(package.BrewName!, package.MacMethod == InstallMethod.HomebrewCask, ct)
-            : null;
+    {
+        switch (package.MacMethod)
+        {
+            case InstallMethod.HomebrewCask or InstallMethod.Homebrew when !string.IsNullOrWhiteSpace(package.BrewName):
+                return await BrewResolver.ResolveAsync(package.BrewName!, package.MacMethod == InstallMethod.HomebrewCask, ct);
+            case InstallMethod.Direct when Text.IsHttpUrl(package.MacDirectUrl):
+                return Both(MacDirect(package));
+            case InstallMethod.Upload when Text.IsSha256(package.MacUploadSha256):
+                return Both(Upload(package.MacUploadSha256!, package.MacUploadFileName, TargetOs.MacOS, package.MacDirectVersion, null, package.MacAppBundleName));
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>One release for both architectures (a command line, or one installer for every processor).</summary>
+    private static Dictionary<CpuArchitecture, ResolvedRelease> Both(ResolvedRelease release) => new() { [CpuArchitecture.X64] = release, [CpuArchitecture.Arm64] = release };
+
+    /// <summary>
+    /// Chocolatey: the version of the repository (so devices see updates); the device runs "choco". When the repository cannot be asked, the plan
+    /// stays without a version. Chocolatey's title also becomes the name to recognise the app by, when none is set and it differs from the name.
+    /// </summary>
+    private static async Task<ResolvedRelease> ChocolateyAsync(Package package, CancellationToken ct)
+    {
+        SourceHit? latest;
+        try
+        {
+            latest = await ChocolateySource.FindAsync(package.ChocoId!, ct);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
+        {
+            return new ResolvedRelease(InstallMethod.Chocolatey, null, Note: "Wird mit choco installiert. Chocolatey ist gerade nicht erreichbar: die Version folgt beim nächsten Auflösen.");
+        }
+
+        if (latest is null)
+        {
+            throw new ResolveException($"Das Paket „{package.ChocoId}“ gibt es bei Chocolatey nicht.");
+        }
+
+        if (string.IsNullOrWhiteSpace(package.DetectDisplayName) && !string.Equals(latest.Name, package.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            package.DetectDisplayName = Text.Clean(latest.Name, 200);
+        }
+
+        return new ResolvedRelease(InstallMethod.Chocolatey, latest.Version, Note: "Wird mit choco installiert (fehlt Chocolatey, richtet ThixInstall es ein).");
+    }
+
+    /// <summary>The Microsoft Store: the version (when the Store names one) and the package family the device recognises the app by.</summary>
+    private static async Task<ResolvedRelease> StoreAsync(Package package, CancellationToken ct)
+    {
+        var manifest = await StoreSource.ManifestAsync(package.StoreId!, ct)
+                       ?? throw new ResolveException($"Die App „{package.StoreId}“ gibt es im Microsoft Store nicht.");
+        if (manifest.PackageFamilyName is { } family && package.StorePackageFamilyName != family)
+        {
+            package.StorePackageFamilyName = Text.Clean(family, 200);
+        }
+
+        return new ResolvedRelease(InstallMethod.MicrosoftStore, manifest.Version,
+            Note: "Wird aus dem Microsoft Store installiert, vom angemeldeten Benutzer" + (manifest.Version is null ? "; die App aktualisiert sich selbst." : "."));
+    }
+
+    /// <summary>An uploaded installer: the file of the cloud, with the arguments and the version the administrator gave.</summary>
+    public static ResolvedRelease Upload(string sha256, string? fileName, TargetOs os, string? version, string? silentArguments, string? appBundleName)
+    {
+        var kind = PackageUploads.KindOf(fileName, os) ?? (os == TargetOs.Windows ? InstallerKind.Exe : InstallerKind.Dmg);
+        var arguments = os == TargetOs.Windows ? silentArguments ?? (kind == InstallerKind.Msi ? "/qn /norestart" : string.Empty) : null;
+        return new ResolvedRelease(InstallMethod.Upload, version, PackageUploads.UrlOf(sha256), sha256, kind, arguments, AppBundleName: appBundleName,
+            FileName: fileName ?? sha256);
+    }
+
+    /// <summary>A direct download for macOS: a dmg or zip with the app, or a pkg, told by the end of the address.</summary>
+    public static ResolvedRelease MacDirect(Package package)
+    {
+        var fileName = Text.FileNameOf(package.MacDirectUrl) ?? string.Empty;
+        var kind = PackageUploads.KindOf(fileName, TargetOs.MacOS)
+                   ?? throw new ResolveException("Die Adresse für macOS endet nicht auf .dmg, .pkg oder .zip.");
+        return new ResolvedRelease(InstallMethod.Direct, package.MacDirectVersion, package.MacDirectUrl, package.MacDirectSha256, kind,
+            AppBundleName: package.MacAppBundleName, FileName: fileName);
+    }
 
     /// <summary>A direct download: an msi is started with msiexec, everything else as a program with the given arguments.</summary>
     public static ResolvedRelease Direct(Package package)
@@ -195,8 +274,12 @@ public static class ReleaseService
         var rows = await db.Releases.AsNoTracking().Where(r => r.PackageId == packageId).OrderBy(r => r.Os).ThenBy(r => r.Architecture).ToListAsync(ct);
         var urls = rows.Where(r => r.InstallerUrl != null).Select(r => r.InstallerUrl!).Distinct().ToList();
         var cached = await db.CacheFiles.AsNoTracking().Where(c => urls.Contains(c.SourceUrl)).Select(c => c.SourceUrl).ToListAsync(ct);
-        return rows.Select(r => new ReleaseView(r.Id, r.Os, r.Architecture, r.Method, r.Version, r.InstallerUrl, r.Sha256, r.InstallerKind, r.SilentArguments,
-            r.FileName, r.ResolvedDate, r.Error, r.Note, r.InstallerUrl is not null && cached.Contains(r.InstallerUrl))).ToList();
+        return rows.Select(r =>
+        {
+            var upload = PackageUploads.IsUpload(r.InstallerUrl);
+            return new ReleaseView(r.Id, r.Os, r.Architecture, r.Method, r.Version, r.InstallerUrl, r.Sha256, r.InstallerKind, r.SilentArguments,
+                r.FileName, r.ResolvedDate, r.Error, r.Note, upload || (r.InstallerUrl is not null && cached.Contains(r.InstallerUrl)), upload);
+        }).ToList();
     }
 
     /// <summary>The plan of a release for a device (or the command line of the method when there is no release yet).</summary>
@@ -212,12 +295,14 @@ public static class ReleaseService
         {
             InstallMethod.Winget => package.WingetId,
             InstallMethod.Chocolatey => package.ChocoId,
+            InstallMethod.MicrosoftStore => package.StoreId,
             InstallMethod.Homebrew or InstallMethod.HomebrewCask => package.BrewName,
             _ => null,
         };
         if (release is null || release.Method != method)
         {
-            return method == InstallMethod.Direct ? null : new InstallPlan { Method = method.Value, PackageId = packageId };
+            // a download or an upload needs its release (the address in the cloud); the package managers work without one
+            return method is InstallMethod.Direct or InstallMethod.Upload ? null : new InstallPlan { Method = method.Value, PackageId = packageId };
         }
 
         var download = release.InstallerUrl is not null && release.InstallerKind is not null;
@@ -241,7 +326,9 @@ public static class ReleaseService
     {
         InstallMethod.Winget => "winget",
         InstallMethod.Chocolatey => "Chocolatey",
+        InstallMethod.MicrosoftStore => "Microsoft Store",
         InstallMethod.Direct => "Direkter Download",
+        InstallMethod.Upload => "Eigene Datei",
         InstallMethod.Homebrew => "Homebrew-Formel",
         InstallMethod.HomebrewCask => "Homebrew-Cask",
         _ => "–",

@@ -1,0 +1,102 @@
+@page "/Catalog/Packages/Add"
+@model ThixInstall.Cloud.Pages.Catalog.Packages.AddModel
+@{
+    ViewData["Title"] = "App hinzufügen";
+    ViewData["PageSub"] = "Einen Namen suchen, je System einen Treffer wählen – den Rest füllt die Cloud aus winget, Microsoft Store, Chocolatey und Homebrew.";
+    ViewData["Crumbs"] = new List<(string, string?)> { ("Katalog", null), ("Apps", "/Catalog/Packages"), ("Hinzufügen", null) };
+    ViewData["Width"] = "narrow";
+    var result = Model.Result;
+}
+
+<form method="get" class="mat-card ti-source-search" role="search">
+    <div class="mat-card__body">
+        <label class="mat-label" for="q">App suchen</label>
+        <div class="ti-source-search__row">
+            <div class="mat-input-icon ti-source-search__field">
+                @Ui.Icon("search")
+                <input class="mat-input" type="search" id="q" name="q" value="@Model.Query" placeholder="z. B. Firefox, 7-Zip, WhatsApp, git" autocomplete="off" enterkeyhint="search" minlength="2" maxlength="100" autofocus />
+            </div>
+            <button type="submit" class="mat-btn mat-btn--primary">@Ui.Icon("search")<span>Suchen</span></button>
+        </div>
+        <span class="mat-hint">Gesucht wird in winget, im Microsoft Store und bei Chocolatey (Windows) sowie bei Homebrew (macOS). Das erste Mal dauert es etwas: die Cloud lädt die Listen der Quellen.</span>
+    </div>
+</form>
+
+@if (result is null)
+{
+    <partial name="_Empty" model="@(new EmptyStateModel("search", "Welche App soll in den Katalog?", "Gib oben einen Namen ein. Für Sonderfälle – ein eigener Installer, ein direkter Download – gibt es das ausführliche Formular.", false))" />
+    <div class="mat-actions">
+        <a class="mat-btn mat-btn--secondary" href="/Catalog/Packages/Edit">@Ui.Icon("edit")<span>Manuell anlegen</span></a>
+        <a class="mat-btn mat-btn--secondary" href="/Catalog/Packages">@Ui.Icon("back")<span>Zurück</span></a>
+    </div>
+}
+else
+{
+    @if (result.Problems.Count > 0)
+    {
+        <div class="mat-alert mat-alert--warning" role="status">
+            @Ui.Icon("alert")
+            <div class="mat-alert__body">
+                @foreach (var p in result.Problems)
+                {
+                    <div><strong>@SourceSearch.KindName(p.Kind):</strong> @p.Message</div>
+                }
+            </div>
+        </div>
+    }
+
+    <form method="post" class="mat-form" asp-route-q="@Model.Query" novalidate>
+        <partial name="_FormSummary" model="ViewData.ModelState" />
+        @foreach (var (os, hits, field, value) in new[] { (TargetOs.Windows, result.Windows, "WindowsPick", Model.WindowsPick), (TargetOs.MacOS, result.Mac, "MacPick", Model.MacPick) })
+        {
+            <fieldset class="mat-card ti-hits" id="@field">
+                <legend class="mat-card__head ti-hits__head"><span class="mat-card__title">@Ui.Icon(Ui.OsIcon(os))@Ui.OsName(os)</span></legend>
+                <div class="ti-hits__list">
+                    @* one group per source, the source with the best hit first *@
+                    @foreach (var group in hits.GroupBy(h => h.Kind).OrderBy(g => g.Min(h => h.Score)).ThenBy(g => g.Key))
+                    {
+                        <div class="ti-hits__source">@SourceSearch.KindName(group.Key)</div>
+                        @foreach (var h in group)
+                        {
+                            var id = field + "-" + h.Kind + "-" + h.Id.Replace('.', '-').Replace('@', '-').Replace('+', '-');
+                            var taken = h.ExistingPackageId is not null;
+                            <label class="ti-hit@(taken ? " is-taken" : "")" for="@id">
+                                <input type="radio" id="@id" name="@field" value="@h.Value" @(h.Value == value ? "checked" : "") @(taken ? "disabled" : "") />
+                                <span class="ti-hit__text">
+                                    <span class="ti-hit__name">@h.Name @if (h.Version is not null) { <small class="mat-muted mat-mono">@h.Version</small> }</span>
+                                    <span class="ti-hit__meta">
+                                        <span class="mat-mono">@h.Id</span>
+                                        @if (h.Publisher is not null) { <span>· @h.Publisher</span> }
+                                    </span>
+                                    @if (h.Description is not null) { <span class="ti-hit__desc mat-muted">@h.Description</span> }
+                                    @if (taken) { <span class="ti-hit__taken">Schon im Katalog: <a href="/Catalog/Packages/Edit?id=@h.ExistingPackageId">@h.ExistingName</a></span> }
+                                </span>
+                            </label>
+                        }
+                    }
+                    @if (hits.Count == 0)
+                    {
+                        <p class="ti-hits__none mat-muted">Keine Treffer für @Ui.OsName(os).</p>
+                    }
+                    <label class="ti-hit ti-hit--none" for="@field-none">
+                        <input type="radio" id="@field-none" name="@field" value="" @(string.IsNullOrEmpty(value) ? "checked" : "") />
+                        <span class="ti-hit__text"><span class="ti-hit__name">Nicht für @Ui.OsName(os)</span></span>
+                    </label>
+                </div>
+            </fieldset>
+        }
+
+        <div class="mat-card">
+            <div class="mat-card__body mat-form">
+                <ti-field name="Category" label="Kategorie" required value="@Model.Category" maxlength="60" suggest="Model.Categories" msg-required="Bitte eine Kategorie angeben." />
+                <ti-field name="IsPublic" kind="switch" label="Öffentlich: auch Besucher ohne Konto sehen die App" value="@Model.IsPublic.ToString()" />
+            </div>
+        </div>
+
+        <div class="mat-btn-row ti-btn-row">
+            <button type="submit" class="mat-btn mat-btn--primary" data-busy="Lege an …">@Ui.Icon("plus")<span>App anlegen</span></button>
+            <a class="mat-btn mat-btn--secondary" href="/Catalog/Packages/Edit">@Ui.Icon("edit")<span>Manuell anlegen</span></a>
+            <a class="mat-btn mat-btn--secondary ti-btn-collapse" href="/Catalog/Packages" aria-label="Zurück" data-tip="Zurück">@Ui.Icon("back")<span>Zurück</span></a>
+        </div>
+    </form>
+}

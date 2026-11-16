@@ -8,6 +8,7 @@ using ThixInstall.Shared;
 namespace ThixInstall.Cloud.Tests;
 
 /// <summary>The business layer against a real PostgreSQL (THIXINSTALL_TEST_DB): enrollment, actions, profiles, bundles, the catalog and the cache.</summary>
+[Collection(TestWorld.Collection)]
 public sealed class FlowTests
 {
     private static async Task<(DeviceIdentity Identity, string Token)> EnrollAsync(TestDatabase test, EnrollRequest request)
@@ -217,7 +218,7 @@ public sealed class FlowTests
         }
         finally
         {
-            Net.UseHandlerForTests(null);
+            Net.UseHandlerForTests(TestDatabase.Offline);
         }
     }
 }

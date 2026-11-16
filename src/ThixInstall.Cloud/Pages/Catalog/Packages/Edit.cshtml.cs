@@ -6,18 +6,23 @@ using ThixInstall.Shared;
 namespace ThixInstall.Cloud.Pages.Catalog.Packages;
 
 /// <summary>
-/// An app of the catalog with its areas as tabs: Allgemein (name, category, icon, visibility), Windows (winget, Chocolatey or a direct download, and how
-/// the installed app is recognised), macOS (Homebrew cask or formula), Versionen (what the sources resolved to, "Jetzt auflösen"). A new app has the
-/// first tab only; saving it opens the others.
+/// An app of the catalog with its areas as tabs: Allgemein (name, category, icon, visibility), Windows (winget, Microsoft Store, Chocolatey, a direct
+/// download or an uploaded installer, and how the installed app is recognised), macOS (Homebrew cask or formula, a direct download or an uploaded
+/// installer), Versionen (what the sources resolved to, "Jetzt auflösen"). A new app has the first tab only; saving it opens the others.
+/// Installers up to 2 GB may be uploaded here (the limit of this page only).
 /// </summary>
+[RequestSizeLimit(PackageUploads.MaxBytes + 4 * 1024 * 1024)]
+[RequestFormLimits(MultipartBodyLengthLimit = PackageUploads.MaxBytes + 4 * 1024 * 1024)]
 public sealed class EditModel : AppPageModel
 {
     public static readonly IReadOnlyList<Choice> WindowsMethods =
     [
         new(string.Empty, "Nicht für Windows"),
         new("Winget", "winget", "Empfohlen: die Cloud lädt den Installer aus dem winget-Manifest und hält ihn im Cache"),
-        new("Chocolatey", "Chocolatey", "Das Gerät ruft choco auf (Chocolatey muss installiert sein)"),
+        new("MicrosoftStore", "Microsoft Store", "Das Gerät installiert die App aus dem Store, als angemeldeter Benutzer"),
+        new("Chocolatey", "Chocolatey", "Das Gerät ruft choco auf (fehlt Chocolatey, richtet ThixInstall es ein)"),
         new("Direct", "Direkter Download", "Eine Adresse und die Parameter für die stille Installation"),
+        new("Upload", "Eigene Datei", "Ein Installer (MSI, EXE, MSIX), den du hier hochlädst"),
     ];
 
     public static readonly IReadOnlyList<Choice> MacMethods =
@@ -25,6 +30,8 @@ public sealed class EditModel : AppPageModel
         new(string.Empty, "Nicht für macOS"),
         new("HomebrewCask", "Homebrew-Cask", "Apps: die Cloud lädt dmg, zip oder pkg und hält sie im Cache"),
         new("Homebrew", "Homebrew-Formel", "Kommandozeilen-Werkzeuge: das Gerät ruft brew auf"),
+        new("Direct", "Direkter Download", "Die Adresse einer dmg, pkg oder zip"),
+        new("Upload", "Eigene Datei", "Eine dmg, pkg oder zip, die du hier hochlädst"),
     ];
 
     [BindProperty(SupportsGet = true)]
@@ -45,6 +52,7 @@ public sealed class EditModel : AppPageModel
     [BindProperty] public string WindowsMethod { get; set; } = string.Empty;
     [BindProperty] public string WingetId { get; set; } = string.Empty;
     [BindProperty] public string ChocoId { get; set; } = string.Empty;
+    [BindProperty] public string StoreId { get; set; } = string.Empty;
     [BindProperty] public string DirectUrl { get; set; } = string.Empty;
     [BindProperty] public string DirectSilentArguments { get; set; } = string.Empty;
     [BindProperty] public string DirectSha256 { get; set; } = string.Empty;
@@ -52,10 +60,23 @@ public sealed class EditModel : AppPageModel
     [BindProperty] public string DetectDisplayName { get; set; } = string.Empty;
     [BindProperty] public string MacMethod { get; set; } = string.Empty;
     [BindProperty] public string BrewName { get; set; } = string.Empty;
+    [BindProperty] public string MacDirectUrl { get; set; } = string.Empty;
+    [BindProperty] public string MacDirectSha256 { get; set; } = string.Empty;
+    [BindProperty] public string MacDirectVersion { get; set; } = string.Empty;
     [BindProperty] public string MacAppBundleName { get; set; } = string.Empty;
     [BindProperty] public IFormFile? Icon { get; set; }
+    [BindProperty] public IFormFile? WindowsFile { get; set; }
+    [BindProperty] public IFormFile? MacFile { get; set; }
 
     public bool IsNew => Id is null;
+
+    /// <summary>The uploaded installers (shown above the field for a new one).</summary>
+    public string? WindowsUploadFileName { get; private set; }
+
+    public string? MacUploadFileName { get; private set; }
+
+    /// <summary>The package family of a Store app as the Store named it (shown; it comes with resolving).</summary>
+    public string? StorePackageFamilyName { get; private set; }
 
     public bool HasIcon { get; private set; }
 
@@ -111,14 +132,18 @@ public sealed class EditModel : AppPageModel
     public async Task<IActionResult> OnPostWindowsAsync()
     {
         Tab = "windows";
-        var outcome = await CatalogService.SaveWindowsAsync(Db, Actor, Input(), HttpContext.RequestAborted);
+        await using var file = WindowsFile is { Length: > 0 } ? WindowsFile.OpenReadStream() : null;
+        var upload = file is null ? null : new UploadFile(file, WindowsFile!.FileName, WindowsFile.Length);
+        var outcome = await CatalogService.SaveWindowsAsync(Db, Actor, Input(), upload, HttpContext.RequestAborted);
         return await AfterSourceAsync(outcome);
     }
 
     public async Task<IActionResult> OnPostMacAsync()
     {
         Tab = "macos";
-        var outcome = await CatalogService.SaveMacAsync(Db, Actor, Input(), HttpContext.RequestAborted);
+        await using var file = MacFile is { Length: > 0 } ? MacFile.OpenReadStream() : null;
+        var upload = file is null ? null : new UploadFile(file, MacFile!.FileName, MacFile.Length);
+        var outcome = await CatalogService.SaveMacAsync(Db, Actor, Input(), upload, HttpContext.RequestAborted);
         return await AfterSourceAsync(outcome);
     }
 
@@ -209,6 +234,7 @@ public sealed class EditModel : AppPageModel
         WindowsMethod = Enum.TryParse<InstallMethod>(WindowsMethod, out var w) ? w : null,
         WingetId = WingetId,
         ChocoId = ChocoId,
+        StoreId = StoreId,
         DirectUrl = DirectUrl,
         DirectSilentArguments = DirectSilentArguments,
         DirectSha256 = DirectSha256,
@@ -216,6 +242,9 @@ public sealed class EditModel : AppPageModel
         DetectDisplayName = DetectDisplayName,
         MacMethod = Enum.TryParse<InstallMethod>(MacMethod, out var m) ? m : null,
         BrewName = BrewName,
+        MacDirectUrl = MacDirectUrl,
+        MacDirectSha256 = MacDirectSha256,
+        MacDirectVersion = MacDirectVersion,
         MacAppBundleName = MacAppBundleName,
     };
 
@@ -248,6 +277,9 @@ public sealed class EditModel : AppPageModel
         var p = outcome.Value!;
         HasIcon = p.HasIcon;
         ResolvedDate = p.ResolvedDate;
+        WindowsUploadFileName = p.WindowsUploadFileName;
+        MacUploadFileName = p.MacUploadFileName;
+        StorePackageFamilyName = p.StorePackageFamilyName;
         if (fill)
         {
             Key = p.Key;
@@ -262,6 +294,7 @@ public sealed class EditModel : AppPageModel
             WindowsMethod = p.WindowsMethod?.ToString() ?? string.Empty;
             WingetId = p.WingetId ?? string.Empty;
             ChocoId = p.ChocoId ?? string.Empty;
+            StoreId = p.StoreId ?? string.Empty;
             DirectUrl = p.DirectUrl ?? string.Empty;
             DirectSilentArguments = p.DirectSilentArguments ?? string.Empty;
             DirectSha256 = p.DirectSha256 ?? string.Empty;
@@ -269,6 +302,9 @@ public sealed class EditModel : AppPageModel
             DetectDisplayName = p.DetectDisplayName ?? string.Empty;
             MacMethod = p.MacMethod?.ToString() ?? string.Empty;
             BrewName = p.BrewName ?? string.Empty;
+            MacDirectUrl = p.MacDirectUrl ?? string.Empty;
+            MacDirectSha256 = p.MacDirectSha256 ?? string.Empty;
+            MacDirectVersion = p.MacDirectVersion ?? string.Empty;
             MacAppBundleName = p.MacAppBundleName ?? string.Empty;
         }
         else if (Name.Length == 0)

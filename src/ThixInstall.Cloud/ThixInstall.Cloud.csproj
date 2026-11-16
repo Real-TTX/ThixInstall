@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <!--
-    ThixInstall.Cloud: the server of ThixInstall. The catalog of apps and scripts (sources: winget, Chocolatey, Homebrew, direct downloads, resolved
+    ThixInstall.Cloud: the server of ThixInstall. The catalog of apps and scripts (sources: winget, Microsoft Store, Chocolatey, Homebrew, direct downloads, uploads, resolved
     by the cloud and cached in /data/cache), the start page that puts bundles together (a PWA, Razor Pages with MatUi), the devices with their
     inventory and actions, the profiles, the API under /api/v1 (see ThixInstall.Shared/ApiContract.cs). PostgreSQL through EF Core.
   -->
@@ -21,6 +21,8 @@
     </PackageReference>
     <!-- The installer manifests of winget are YAML. -->
     <PackageReference Include="YamlDotNet" Version="16.*" />
+    <!-- The index of winget (the search of "App hinzufügen") is an SQLite database. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.*" />
   </ItemGroup>
 
   <ItemGroup>

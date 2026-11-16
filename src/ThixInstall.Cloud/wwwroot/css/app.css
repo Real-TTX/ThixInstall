@@ -89,6 +89,38 @@
 .ti-copyline { display: flex; gap: var(--mat-space-2); }
 .ti-copyline .mat-input { flex: 1; min-width: 0; }
 
+/* ---- "App hinzufügen": the search over the sources, one hit per system --------------------------------------------- */
+.ti-source-search__row { display: flex; gap: var(--mat-space-2); }
+.ti-source-search__field { flex: 1; min-width: 0; }
+.ti-source-search .mat-hint { display: block; margin-top: var(--mat-space-2); }
+.ti-hits { margin: 0; padding: 0; min-width: 0; }
+.ti-hits__head { float: left; width: 100%; }
+.ti-hits__head + * { clear: both; }
+.ti-hits__list { display: grid; }
+.ti-hits__none { margin: 0; padding: var(--mat-space-3) var(--mat-space-4); }
+.ti-hits__source {
+  padding: var(--mat-space-2) var(--mat-space-4); border-top: 1px solid var(--mat-border); background: var(--mat-surface-2);
+  color: var(--mat-text-muted); font-size: var(--mat-fs-xs); font-weight: 650; text-transform: uppercase; letter-spacing: .04em;
+}
+.ti-hits__list > .ti-hits__source:first-child { border-top: 0; }
+.ti-hit {
+  display: flex; align-items: flex-start; gap: var(--mat-space-3); padding: var(--mat-space-3) var(--mat-space-4); border-top: 1px solid var(--mat-border);
+  cursor: pointer; transition: background-color var(--mat-dur) var(--mat-ease);
+}
+.ti-hits__list > .ti-hit:first-child { border-top: 0; }
+.ti-hit:hover { background: var(--mat-surface-2); }
+.ti-hit:has(input:checked) { background: var(--mat-accent-soft); }
+.ti-hit:has(input:focus-visible) { box-shadow: inset var(--mat-focus-ring); }
+.ti-hit input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--mat-accent); cursor: pointer; }
+.ti-hit.is-taken { cursor: default; }
+.ti-hit.is-taken .ti-hit__name { color: var(--mat-text-muted); }
+.ti-hit__text { display: grid; gap: 2px; min-width: 0; }
+.ti-hit__name { font-weight: 650; overflow-wrap: anywhere; }
+.ti-hit__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--mat-space-2); color: var(--mat-text-muted); font-size: var(--mat-fs-xs); overflow-wrap: anywhere; }
+.ti-hit__desc { font-size: var(--mat-fs-sm); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.ti-hit__taken { font-size: var(--mat-fs-sm); }
+.ti-hit--none .ti-hit__name { font-weight: 400; color: var(--mat-text-muted); }
+
 /* ---- Facts of an item, outputs ------------------------------------------------------------------------------------- */
 .mat-card__head > .mat-btn:last-child { margin-left: auto; }
 .ti-facts { display: grid; grid-template-columns: minmax(0, max-content) 1fr; margin: 0; }

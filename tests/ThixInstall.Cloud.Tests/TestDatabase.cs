@@ -26,9 +26,13 @@ public sealed class TestDatabase : IAsyncDisposable
 
     static TestDatabase()
     {
-        // the tests never ask GitHub or Homebrew: the background resolver stays off
+        // the tests never ask GitHub, Homebrew, Chocolatey or the Store: the background resolver stays off, and the world answers 404
         Environment.SetEnvironmentVariable("THIXINSTALL_RESOLVE", "off");
+        Net.UseHandlerForTests(Offline);
     }
+
+    /// <summary>The world of the tests that set none of their own: every address answers 404.</summary>
+    public static FakeWorld Offline { get; } = new(_ => null);
 
     private TestDatabase()
     {
@@ -125,6 +129,12 @@ public static class Samples
     public static DeviceFacts Windows(string name = "PC-1", string? hardwareId = "HW-1") => new(name, TargetOs.Windows, "10.0.26200", CpuArchitecture.X64, "0.1.5-20261115", hardwareId);
 
     public static DeviceFacts Mac(string name = "Mac", string? hardwareId = "HW-MAC") => new(name, TargetOs.MacOS, "15.1", CpuArchitecture.Arm64, "0.1.5-20261115", hardwareId);
+}
+
+/// <summary>The tests that put a world of their own in (<see cref="Net.UseHandlerForTests"/>) run one after the other.</summary>
+public static class TestWorld
+{
+    public const string Collection = "world";
 }
 
 /// <summary>An HTTP handler that answers from a table instead of the internet, and counts the requests.</summary>

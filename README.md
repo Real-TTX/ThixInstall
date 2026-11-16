@@ -11,8 +11,11 @@ schickst. Eine einfache Version von Intune/Entra.
 - **Plakative Auswahl**: Apps als Kacheln nach Kategorien, Skripte („Makros“) daneben, getrennt nach Windows und macOS.
 - **Ein Download, alles installiert**: **eine** EXE, die Konfiguration (Apps, Skripte, ThixInstall selbst, Profil) steckt
   darin; sie installiert nacheinander, überspringt Aktuelles, aktualisiert Älteres.
-- **winget, Chocolatey und Homebrew im Unterbau** – die Cloud löst die Installer auf (winget-Manifeste, Homebrew-API) und
-  **cached die Downloads**: jedes Gerät lädt aus deiner Cloud, geprüft per SHA-256.
+- **winget, Microsoft Store, Chocolatey und Homebrew im Unterbau** – die Cloud löst die Installer auf (winget-Manifeste, Homebrew-API) und
+  **cached die Downloads**: jedes Gerät lädt aus deiner Cloud, geprüft per SHA-256. Dazu direkte Downloads und **eigene Installer**
+  (MSI, EXE, MSIX, DMG, PKG, ZIP), die du in die Cloud hochlädst – für Firmensoftware, die es in keinem Repository gibt.
+- **App hinzufügen mit einem Klick**: Namen eingeben, die Cloud sucht in allen Quellen, schlägt je System den passenden Treffer vor und füllt
+  Name, Herausgeber, Beschreibung, Homepage und Icon selbst aus.
 - **ThixInstall auf dem Gerät** (Tray / Menüleiste): Katalog, Updates (einzeln, alle, oder automatisch täglich), Skripte,
   Aufträge mit Ausgabe. Unter Windows erledigt ein **Dienst** die Arbeit – still, ohne UAC-Abfragen, für alle Benutzer.
 - **Sync**: das Gerät meldet seine installierten Apps und führt Aktionen aus der Cloud aus (installieren, aktualisieren,
@@ -43,6 +46,10 @@ schickst. Eine einfache Version von Intune/Entra.
 |---|---|---|
 | ![Versionen](docs/images/cloud-package-versions.png) | ![Auftrag](docs/images/cloud-action.png) | ![Telefon](docs/images/cloud-phone-devices.png) |
 
+| App hinzufügen: alle Quellen durchsuchen | Eigene Datei als Quelle | Telefon |
+|---|---|---|
+| ![App hinzufügen](docs/images/cloud-add-search.png) | ![Eigene Datei](docs/images/cloud-package-upload.png) | ![App hinzufügen am Telefon](docs/images/cloud-add-phone.png) |
+
 ## So funktioniert es
 
 ```
@@ -51,7 +58,7 @@ Startseite der Cloud ──► Auswahl ──► eine EXE (Konfiguration eingepa
                                            └─ mit Konto: ThixInstall wird mitinstalliert und verbunden
 ThixInstall.Cloud ◄──── Inventar, Ergebnisse ────── Gerät (Dienst / App)
         │──────────── Aufträge (Sync), Profile ────►
-        └─ löst Pakete auf (winget, Homebrew) und liefert die Installer aus dem Cache
+        └─ löst Pakete auf (winget, Store, Chocolatey, Homebrew) und liefert die Installer aus dem Cache
 ```
 
 Mehr: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (Begriffe, Betriebsarten, Datenmodell) und [docs/CLOUD.md](docs/CLOUD.md) (Server).

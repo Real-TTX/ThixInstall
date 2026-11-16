@@ -12,7 +12,7 @@ public sealed record Choice(string Value, string Label, string? Hint = null);
 
 /// <summary>
 /// The one code base of a form field (label above, hint below, the error at the field): <c>&lt;ti-field name="Text" label="Text" required /&gt;</c>.
-/// Kinds: text, password, number, url, search, textarea, select (the toolkit's select picker), radios (up to five exclusive choices), switch, check, file.
+/// Kinds: text, password, number, url, search, textarea, select (the toolkit's select picker), radios (exclusive choices; more than four stacked), switch, check, file (pasting only for images).
 /// The message of the server (<c>ModelState</c>) is shown at the field; the id of a field is its name (or <c>id</c>, when two forms of a page have a field
 /// of the same name), so the summary at the top of a form can link to it. A field can depend on another (<c>show-if="#Kind" show-value="Text"</c>).
 /// </summary>
@@ -212,7 +212,9 @@ public sealed class FieldTagHelper : TagHelper
                 sb.Append("</div></div>");
                 break;
             case "file":
-                sb.Append($"<div class=\"mat-upload\" data-upload data-paste{Attr("data-max-size", MaxSize)}>");
+                // pasting from the clipboard is for pictures only (an icon), not for installers
+                var paste = Accept is null || Accept.Contains("image/", StringComparison.OrdinalIgnoreCase) ? " data-paste" : string.Empty;
+                sb.Append($"<div class=\"mat-upload\" data-upload{paste}{Attr("data-max-size", MaxSize)}>");
                 sb.Append($"<input class=\"mat-upload__input\" type=\"file\" id=\"{id}\" name=\"{name}\"{Attr("accept", Accept)}{common} /></div>");
                 break;
             default:
@@ -233,12 +235,16 @@ public sealed class FieldTagHelper : TagHelper
         }
     }
 
-    /// <summary>Up to five exclusive choices: a fieldset with a legend and a radio per choice, as the toolkit draws them.</summary>
+    /// <summary>
+    /// Exclusive choices: a fieldset with a legend and a radio per choice, as the toolkit draws them – side by side up to four, one below the other
+    /// when there are more (they would wrap unevenly).
+    /// </summary>
     private string Radios(string id, string value, string? error)
     {
         var sb = new StringBuilder();
+        var inline = (Options?.Count() ?? 0) <= 4 ? " mat-checks--inline" : string.Empty;
         sb.Append($"<fieldset class=\"mat-field mat-fieldset{(error is null ? string.Empty : " is-invalid")}\" id=\"{id}\"").Append(ShowIfAttributes());
-        sb.Append($"><legend class=\"mat-legend\">{E(Label)}</legend><div class=\"mat-checks mat-checks--inline\">");
+        sb.Append($"><legend class=\"mat-legend\">{E(Label)}</legend><div class=\"mat-checks{inline}\">");
         var i = 0;
         foreach (var o in Options ?? [])
         {

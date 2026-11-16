@@ -10,7 +10,8 @@ everything silently. With an account the bundle can also install **ThixInstall i
 account, shows updates, installs from the catalog and - with **Sync** on - runs the actions sent from the cloud (a simple
 Intune/Entra). **Profiles** bundle apps and scripts for devices and allow auto-enrollment with a key. Underneath it uses
 **winget / Chocolatey / Homebrew**; the cloud resolves the installers (winget manifests, Homebrew cask API) and **caches the
-downloads**. The design (data model, modes, installing) is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the server is
+downloads**; further sources are the **Microsoft Store**, direct downloads and **installers uploaded** to the cloud, and "App hinzufügen"
+searches all sources at once (`src/ThixInstall.Cloud/Business/Sources`). The design (data model, modes, installing) is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the server is
 [docs/CLOUD.md](docs/CLOUD.md). UI language German; code, comments and identifiers English.
 
 Stack: **.NET 10**, C#. Desktop: **Avalonia 11.3** (Fluent underneath our own look, "Apple-like"). Cloud: ASP.NET Core

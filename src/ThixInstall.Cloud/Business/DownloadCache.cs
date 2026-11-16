@@ -47,6 +47,14 @@ public static class DownloadCache
             return Outcome<CachedFile>.Missing();
         }
 
+        // an uploaded installer lives outside the cache (its clean-up never removes it)
+        if (PackageUploads.ShaOf(release.InstallerUrl) is { } sha)
+        {
+            return PackageUploads.Find(sha, release.FileName) is { } upload
+                ? Outcome<CachedFile>.Success(upload)
+                : Outcome<CachedFile>.Fail("Die hochgeladene Datei fehlt in der Cloud. Bitte sie neu hochladen.");
+        }
+
         var outcome = await GetAsync(db, release.InstallerUrl, release.Sha256, release.FileName, ct);
         if (outcome.Ok && release.Size != outcome.Value!.Size)
         {

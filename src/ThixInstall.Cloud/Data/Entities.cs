@@ -100,28 +100,54 @@ public sealed class Package : SoftEntity
 
     public int SortOrder { get; set; }
 
-    /// <summary>Winget, Chocolatey, Direct or null (not for Windows).</summary>
+    /// <summary>Winget, MicrosoftStore, Chocolatey, Direct, Upload or null (not for Windows).</summary>
     public InstallMethod? WindowsMethod { get; set; }
 
     public string? WingetId { get; set; }
 
     public string? ChocoId { get; set; }
 
+    /// <summary>The id of an app in the Microsoft Store ("9NKSQGP7F2NH", "XP…").</summary>
+    public string? StoreId { get; set; }
+
+    /// <summary>The package family of a Store app (MSIX): how a device recognises it; null for Store apps that are classic programs.</summary>
+    public string? StorePackageFamilyName { get; set; }
+
     public string? DirectUrl { get; set; }
 
+    /// <summary>The silent arguments of a direct download or an uploaded installer (Windows).</summary>
     public string? DirectSilentArguments { get; set; }
 
     public string? DirectSha256 { get; set; }
 
+    /// <summary>The version of a direct download or an uploaded installer (Windows), as the administrator gives it.</summary>
     public string? DirectVersion { get; set; }
+
+    /// <summary>The installer an administrator uploaded for Windows (<see cref="InstallMethod.Upload"/>): its SHA-256 names the file below /data/uploads.</summary>
+    public string? WindowsUploadSha256 { get; set; }
+
+    public string? WindowsUploadFileName { get; set; }
 
     /// <summary>The start of the name in "Installierte Apps" (Windows); empty = the name of the package.</summary>
     public string? DetectDisplayName { get; set; }
 
-    /// <summary>HomebrewCask, Homebrew or null (not for macOS).</summary>
+    /// <summary>HomebrewCask, Homebrew, Direct, Upload or null (not for macOS).</summary>
     public InstallMethod? MacMethod { get; set; }
 
     public string? BrewName { get; set; }
+
+    /// <summary>A direct download for macOS: a dmg, pkg or zip.</summary>
+    public string? MacDirectUrl { get; set; }
+
+    public string? MacDirectSha256 { get; set; }
+
+    /// <summary>The version of a direct download or an uploaded installer (macOS), as the administrator gives it.</summary>
+    public string? MacDirectVersion { get; set; }
+
+    /// <summary>The installer an administrator uploaded for macOS (dmg, pkg, zip).</summary>
+    public string? MacUploadSha256 { get; set; }
+
+    public string? MacUploadFileName { get; set; }
 
     /// <summary>"Firefox.app"; empty = what the cask names.</summary>
     public string? MacAppBundleName { get; set; }
