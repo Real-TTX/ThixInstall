@@ -74,7 +74,9 @@ macOS über `/Applications/<App>.app` (`CFBundleShortVersionString`) bzw. `brew 
 | **Dienst** (Windows) | `ThixInstall.exe --service` (vom Dienst-Manager) | Der Agent: Verbindung zur Cloud, Inventar, Aufträge, Auto-Updates – als LocalSystem, ohne UAC. |
 | **App** | sonst | Tray + Hauptfenster: Katalog, Updates, Skripte, Aufträge, Einstellungen. Spricht mit dem Agenten über `AgentClient`: Windows installiert → Named Pipe zum Dienst; macOS und Entwicklung → derselbe Agent im eigenen Prozess. |
 
-Skripte im Kontext *Benutzer* führt die App in der Sitzung des Benutzers aus (der Dienst hält sie dafür bereit).
+Skripte im Kontext *Benutzer* und Apps aus dem **Microsoft Store** (`winget --source msstore`; Store-Apps gehören einem Benutzer,
+als LocalSystem geht der Store nicht) führt die App in der Sitzung des Benutzers aus (der Dienst hält sie dafür bereit). Fehlt
+Chocolatey für ein Chocolatey-Paket, installiert der Dienst es vorher still (Skript von chocolatey.org).
 
 ## Cloud: Datenmodell (PostgreSQL)
 

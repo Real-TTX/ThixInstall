@@ -50,20 +50,20 @@ src/ThixInstall.Core     (no UI)
   Models/                AppSettings (per user: look, window), AgentSettings (+ CloudConnection), JobRecord, AgentStatus,
                          CatalogApp/Snapshot, JobRequest, ConnectRequest, AgentSettingsChange, AgentCaller, BusinessException
   Business/              static classes: AgentHost (the agent: start/stop, timers, every request of the app with its permission
-                         checks), JobService (queue, one job at a time, history jobs.json, user-context scripts for the app),
+                         checks), JobService (queue, one job at a time, history jobs.json, user-context scripts and Store apps for the app: RunClaimedAsync),
                          CloudService (enroll/leave, the loop: facts, catalog, inventory, actions long poll), CatalogService
                          (catalog.json, snapshot with installed state), InventoryService (installed apps, matching to the
                          catalog), BundleService (ticket, plan, run, install + enroll ThixInstall), InstallService (Windows:
                          Program Files, service "ThixInstall Agent", HKLM uninstall entry), UpdateService (OTA from GitHub),
                          AutostartService (HKLM/HKCU Run, LaunchAgent), AccessPolicy (policies), MacAppBundle, SettingsService
-  Installers/            WindowsInstaller (cached download → MSI/EXE/MSIX, else winget/choco; silent uninstall), MacInstaller
+  Installers/            WindowsInstaller (cached download → MSI/EXE/MSIX, else winget/choco (installs Chocolatey when missing)/msstore; silent uninstall), MacInstaller
                          (DMG/ZIP → /Applications, PKG via installer, else brew), ScriptRunner, Downloads, JobContext/JobOutcome
   Agent/                 AgentClient (the app's way to the agent: in-process or named pipe "ThixInstall.Agent"), AgentProtocol,
                          AgentPipeServer (the service side; the caller's name and elevation), AgentWindowsService (--service)
   Infrastructure/        CloudClient (HTTP of the contract, downloads with SHA-256), JsonFile, SettingsStore, TokenStore
                          (DPAPI user/machine, Keychain), AppPaths (user data vs agent data), AppInfo, Log, ProblemReports
   Platform/              ProcessRunner (output tail, timeout, kill tree), Elevation (runas, root), InstalledApps (registry,
-                         /Applications, brew), PackageManagers (winget also for LocalSystem, choco, brew), MachineInfo
+                         Store packages by family (AppxAllUserStore), /Applications, brew), PackageManagers (winget also for LocalSystem, choco, brew), MachineInfo
                          (hardware id, OS version), WindowActivation, Windows/ShellLink (generated COM), Windows/MachineFolder (ACL)
 src/ThixInstall          (Avalonia app)
   Program / App          start modes: --service, --agent-console, --self-test, Windows setup commands (--install/--update/
