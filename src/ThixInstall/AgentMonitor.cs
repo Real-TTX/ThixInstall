@@ -137,7 +137,10 @@ internal static class AgentMonitor
         }
     }
 
-    /// <summary>The service keeps scripts of the user's context for the app: run them here, in the user's session.</summary>
+    /// <summary>
+    /// The service keeps what has to run as the user for the app (scripts of the user's context, Store apps): run them here, in the
+    /// user's session.
+    /// </summary>
     private static async Task RunUserJobsAsync()
     {
         if (_runningUserJob)
@@ -148,20 +151,10 @@ internal static class AgentMonitor
         _runningUserJob = true;
         try
         {
-            while (await AgentClient.ClaimUserJobAsync() is { Script: { } script } job)
+            while (await AgentClient.ClaimUserJobAsync() is { } job)
             {
-                Log.Info($"Running the user script \"{script.Name}\" for the service");
-                var context = new JobContext(null, null, (_, _) => { }, CancellationToken.None);
-                JobOutcome outcome;
-                try
-                {
-                    outcome = await ScriptRunner.RunAsync(script, context);
-                }
-                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or BusinessException)
-                {
-                    outcome = new JobOutcome(false, null, exception.Message, exception.Message);
-                }
-
+                Log.Info($"Running \"{job.Title}\" as the user for the service");
+                var outcome = await JobService.RunClaimedAsync(job, CancellationToken.None);
                 await AgentClient.CompleteUserJobAsync(job.Id, outcome.Succeeded, outcome.ExitCode, outcome.Message is null ? outcome.Output : $"{outcome.Output}\n{outcome.Message}".Trim());
             }
         }

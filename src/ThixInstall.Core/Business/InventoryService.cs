@@ -85,7 +85,9 @@ public static class InventoryService
             }
         }
 
+        // Store packages only when they are apps of the catalog (Windows itself brings dozens)
         var apps = entries
+            .Where(entry => entry.Source != "appx" || matched.ContainsKey(entry))
             .Take(ApiContract.MaxInventoryApps)
             .Select(entry => new InstalledApp(entry.Name, entry.Version, entry.Publisher, matched.TryGetValue(entry, out var id) ? id : null, entry.Source))
             .ToList();
@@ -148,6 +150,9 @@ public static class InventoryService
 
             case "brew":
                 return rule.BrewName is { Length: > 0 } brew && string.Equals(entry.Key, brew, StringComparison.OrdinalIgnoreCase);
+
+            case "appx":
+                return rule.PackageFamilyName is { Length: > 0 } family && string.Equals(entry.Key, family, StringComparison.OrdinalIgnoreCase);
 
             default:
                 return false;

@@ -77,7 +77,59 @@ internal static class InstalledApps
             ReadUninstallKey(user, entries);
         }
 
+        ReadStorePackages(entries);
         return entries.Values.OrderBy(entry => entry.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+    }
+
+    /// <summary>
+    /// Store apps (MSIX): the packages Windows keeps per user under AppxAllUserStore\&lt;SID&gt; (the service sees every user, the app
+    /// only its own) and the ones provisioned for everybody. Key = the package family ("Name_PublisherId"), source "appx"; they only count
+    /// for apps of the catalog (the report leaves the others out: Windows has dozens).
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    private static void ReadStorePackages(Dictionary<string, InstalledEntry> entries)
+    {
+        const string storePath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Appx\AppxAllUserStore";
+        try
+        {
+            using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            using var store = machine.OpenSubKey(storePath);
+            if (store is null)
+            {
+                return;
+            }
+
+            var ownSid = System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value;
+            var folders = store.GetSubKeyNames()
+                .Where(name => name == "Applications" || (name.StartsWith("S-1-5-21-", StringComparison.Ordinal) && (Elevation.IsLocalSystem || name == ownSid)));
+            foreach (var folder in folders)
+            {
+                using var packages = store.OpenSubKey(folder);
+                foreach (var fullName in packages?.GetSubKeyNames() ?? [])
+                {
+                    if (StorePackage(fullName) is { } entry)
+                    {
+                        entries.TryAdd("appx|" + fullName, entry);
+                    }
+                }
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            Log.Warning($"The Store apps could not be read: {exception.Message}");
+        }
+    }
+
+    /// <summary>"Microsoft.WindowsTerminal_1.25.3131.0_x64__8wekyb3d8bbwe" → family "Microsoft.WindowsTerminal_8wekyb3d8bbwe", version 1.25.3131.0.</summary>
+    internal static InstalledEntry? StorePackage(string fullName)
+    {
+        var parts = fullName.Split('_');
+        if (parts.Length != 5 || parts[0].Length == 0 || parts[4].Length == 0)
+        {
+            return null;
+        }
+
+        return new InstalledEntry(parts[0], parts[1], null, "appx", parts[0] + "_" + parts[4]);
     }
 
     [SupportedOSPlatform("windows")]

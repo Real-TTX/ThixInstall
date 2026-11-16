@@ -68,6 +68,8 @@ public sealed class AppTileViewModel : ObservableObject
         InstallMethod.Direct => "Direkter Download · Cloud-Cache",
         InstallMethod.HomebrewCask => _app.Package.Install.DownloadUrl is null ? "Homebrew" : "Homebrew · Cloud-Cache",
         InstallMethod.Homebrew => "Homebrew",
+        InstallMethod.MicrosoftStore => "Microsoft Store",
+        InstallMethod.Upload => "Eigene Datei · Cloud-Cache",
         _ => "",
     };
 

@@ -218,14 +218,45 @@ public static class JobService
             WaitingForUser.Remove(job);
         }
 
+        // a Store app the user installed: the service reads the inventory again for the version (and the cloud's report)
+        string? installedVersion = null;
+        if (succeeded && job.Package is { } package && job.Kind is ActionKind.Install or ActionKind.Update)
+        {
+            InventoryService.Refresh();
+            installedVersion = InventoryService.FindInstalled(package)?.Version;
+        }
+
         _ = CompleteAsync(job with
         {
             State = succeeded ? ActionState.Succeeded : ActionState.Failed,
             ExitCode = exitCode,
             Output = Trim(output),
+            InstalledVersion = installedVersion,
             FinishedAt = DateTimeOffset.Now,
             Status = null,
-        }, null);
+        }, job.Package);
+    }
+
+    /// <summary>
+    /// The app runs a job it claimed (<see cref="ClaimUserJob"/>) in the user's session: a user script or a Store app. Returns how it
+    /// ended; the app hands that back with <see cref="CompleteUserJob"/>.
+    /// </summary>
+    internal static async Task<JobOutcome> RunClaimedAsync(JobRecord job, CancellationToken cancellationToken)
+    {
+        if (!job.RunsAsUser)
+        {
+            throw new BusinessException("Dieser Auftrag läuft nicht beim Benutzer.");
+        }
+
+        var context = new JobContext(null, null, (_, _) => { }, cancellationToken);
+        try
+        {
+            return await ExecuteAsync(job, context);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or BusinessException)
+        {
+            return new JobOutcome(false, null, exception.Message, exception.Message);
+        }
     }
 
     /// <summary>Runs one job right here and returns how it ended (the bundle runner and user scripts of the app).</summary>

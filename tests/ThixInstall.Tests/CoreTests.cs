@@ -107,6 +107,46 @@ public sealed class CoreTests
     }
 
     [Fact]
+    public void Store_apps_are_recognised_by_their_package_family_and_reported_only_from_the_catalog()
+    {
+        var terminal = InstalledApps.StorePackage("Microsoft.WindowsTerminal_1.25.3131.0_x64__8wekyb3d8bbwe");
+        Assert.NotNull(terminal);
+        Assert.Equal(("Microsoft.WindowsTerminal_8wekyb3d8bbwe", "1.25.3131.0", "appx"), (terminal.Key, terminal.Version, terminal.Source));
+        Assert.Null(InstalledApps.StorePackage("NotAPackageName"));
+        Assert.True(InventoryService.Matches(new DetectionRule { PackageFamilyName = "microsoft.windowsterminal_8wekyb3d8bbwe" }, terminal));
+        Assert.False(InventoryService.Matches(new DetectionRule { DisplayName = "Microsoft.WindowsTerminal" }, terminal));
+
+        using var data = new TestData();
+        data.Install("Microsoft.WindowsTerminal", "1.25.3131.0", "Microsoft.WindowsTerminal_8wekyb3d8bbwe", "appx");
+        data.Install("Microsoft.BingNews", "4.7.6002.0", "Microsoft.BingNews_8wekyb3d8bbwe", "appx");
+        var store = new PackageDto
+        {
+            Id = 77, Key = "terminal", Name = "Windows Terminal", Category = "Werkzeuge",
+            Install = new InstallPlan { Method = InstallMethod.MicrosoftStore, PackageId = "9N0DX20HK701" },
+            Detection = new DetectionRule { PackageFamilyName = "Microsoft.WindowsTerminal_8wekyb3d8bbwe" },
+        };
+        var report = InventoryService.BuildReport([store]);
+        Assert.Equal(["Microsoft.WindowsTerminal"], report.Apps.Select(app => app.Name));
+        Assert.Equal(77, report.Apps[0].PackageId);
+    }
+
+    [Fact]
+    public void Store_apps_and_user_scripts_run_as_the_user_everything_else_in_the_agent()
+    {
+        var store = new PackageDto
+        {
+            Id = 1, Key = "whatsapp", Name = "WhatsApp", Category = "Kommunikation",
+            Install = new InstallPlan { Method = InstallMethod.MicrosoftStore, PackageId = "9NKSQGP7F2NH" },
+        };
+        var winget = store with { Install = new InstallPlan { Method = InstallMethod.Winget, PackageId = "Mozilla.Firefox" } };
+        Assert.True(JobService.NewJob(ActionKind.Install, ActionOrigin.Device, package: store).RunsAsUser);
+        Assert.True(JobService.NewJob(ActionKind.Uninstall, ActionOrigin.Push, package: store).RunsAsUser);
+        Assert.False(JobService.NewJob(ActionKind.Install, ActionOrigin.Device, package: winget).RunsAsUser);
+        var catalog = SampleCatalog.Create();
+        Assert.False(JobService.NewJob(ActionKind.RunScript, ActionOrigin.Device, script: catalog.Scripts.First(script => script.Context == ScriptContext.System)).RunsAsUser);
+    }
+
+    [Fact]
     public void The_catalog_view_shows_installed_apps_and_updates()
     {
         using var data = new TestData();

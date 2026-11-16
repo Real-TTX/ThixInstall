@@ -7,7 +7,7 @@ namespace ThixInstall.Core.Installers;
 
 /// <summary>
 /// Installs, updates and removes apps on Windows: the installer from the cloud's cache (MSI, EXE, MSIX) when the plan has
-/// one, otherwise winget or Chocolatey. Updating is installing the newer version over the old one (what every one of
+/// one, otherwise winget, Chocolatey (installed first when it is missing) or the Microsoft Store (as the user). Updating is installing the newer version over the old one (what every one of
 /// these installers does).
 /// </summary>
 [SupportedOSPlatform("windows")]
@@ -33,6 +33,7 @@ internal static partial class WindowsInstaller
         {
             InstallMethod.Winget => await WingetAsync(isUpdate ? "upgrade" : "install", plan.PackageId, context),
             InstallMethod.Chocolatey => await ChocolateyAsync(isUpdate ? "upgrade" : "install", plan.PackageId, context),
+            InstallMethod.MicrosoftStore => await StoreAsync(isUpdate ? "upgrade" : "install", plan.PackageId, context),
             _ => JobOutcome.Fail(context, $"Für {package.Name} ist kein Installer bekannt."),
         };
     }
@@ -40,6 +41,11 @@ internal static partial class WindowsInstaller
     public static async Task<JobOutcome> UninstallAsync(PackageDto package, InstalledEntry? installed, JobContext context)
     {
         var plan = package.Install;
+        if (plan?.Method == InstallMethod.MicrosoftStore && plan.PackageId is not null)
+        {
+            return await StoreAsync("uninstall", plan.PackageId, context);
+        }
+
         if (installed?.QuietUninstallCommand is { Length: > 0 } quiet)
         {
             context.Step("Deinstalliere mit dem Befehl des Herstellers");
@@ -147,9 +153,16 @@ internal static partial class WindowsInstaller
         }
 
         var choco = PackageManagers.Chocolatey;
+        if (choco is null && verb != "uninstall")
+        {
+            choco = await InstallChocolateyAsync(context);
+        }
+
         if (choco is null)
         {
-            return JobOutcome.Fail(context, "Chocolatey ist auf diesem Gerät nicht installiert.");
+            return JobOutcome.Fail(context, Elevation.IsElevated
+                ? "Chocolatey konnte nicht installiert werden (Ausgabe oben)."
+                : "Chocolatey ist auf diesem Gerät nicht installiert – ThixInstall kann es nur mit Administratorrechten nachinstallieren (installiert läuft ThixInstall als Dienst und kann das).");
         }
 
         string[] arguments = [verb, packageId, "-y", "--no-progress"];
@@ -157,6 +170,64 @@ internal static partial class WindowsInstaller
         context.Report(verb == "uninstall" ? "Deinstalliere mit Chocolatey …" : "Installiere mit Chocolatey …");
         var result = await ProcessRunner.RunAsync(choco, arguments, InstallTimeout, context.Cancellation);
         return Outcome(result, context, SuccessCodes);
+    }
+
+    /// <summary>
+    /// Chocolatey is missing: install it the way chocolatey.org documents (its install script, run once with administrator rights - the
+    /// service is LocalSystem). Returns choco.exe, or null when that failed or ThixInstall has no administrator rights.
+    /// </summary>
+    private static async Task<string?> InstallChocolateyAsync(JobContext context)
+    {
+        if (!Elevation.IsElevated)
+        {
+            return null;
+        }
+
+        context.Step("Chocolatey fehlt: installiere es (community.chocolatey.org/install.ps1)");
+        context.Report("Installiere Chocolatey …");
+        const string command = "Set-ExecutionPolicy Bypass -Scope Process -Force; " +
+                               "[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; " +
+                               "iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))";
+        var result = await ProcessRunner.RunAsync("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", command],
+            TimeSpan.FromMinutes(10), context.Cancellation);
+        var output = result.Output.Trim();
+        context.Step($"Installation von Chocolatey beendet (Code {result.ExitCode?.ToString() ?? "–"})" +
+                     (output.Length == 0 ? "" : ":" + Environment.NewLine + (output.Length > 2000 ? "…" + output[^2000..] : output)));
+        return PackageManagers.Chocolatey;
+    }
+
+    /// <summary>
+    /// An app of the Microsoft Store through winget's "msstore" source. Runs as the signed-in user: the service hands these jobs to the
+    /// app (<see cref="Models.JobRecord.RunsAsUser"/>); as LocalSystem winget cannot use the store.
+    /// </summary>
+    private static async Task<JobOutcome> StoreAsync(string verb, string? storeId, JobContext context)
+    {
+        if (string.IsNullOrWhiteSpace(storeId))
+        {
+            return JobOutcome.Fail(context, "Für diese App ist keine Store-Id hinterlegt.");
+        }
+
+        if (Elevation.IsLocalSystem)
+        {
+            return JobOutcome.Fail(context, "Apps aus dem Microsoft Store installiert ThixInstall beim angemeldeten Benutzer – dafür muss die ThixInstall-App laufen.");
+        }
+
+        var winget = PackageManagers.Winget;
+        if (winget is null)
+        {
+            return JobOutcome.Fail(context, "winget (App-Installer) ist auf diesem Gerät nicht installiert.");
+        }
+
+        var arguments = new List<string> { verb, "--id", storeId, "--source", "msstore", "--exact", "--silent", "--disable-interactivity", "--accept-source-agreements" };
+        if (verb != "uninstall")
+        {
+            arguments.Add("--accept-package-agreements");
+        }
+
+        context.Step($"winget {string.Join(' ', arguments)}");
+        context.Report(verb switch { "uninstall" => "Deinstalliere aus dem Microsoft Store …", "upgrade" => "Aktualisiere aus dem Microsoft Store …", _ => "Installiere aus dem Microsoft Store …" });
+        var result = await ProcessRunner.RunAsync(winget, arguments, InstallTimeout, context.Cancellation);
+        return Outcome(result, context, [.. SuccessCodes, .. WingetNothingToDo]);
     }
 
     /// <summary>A command line of an uninstall entry ("C:\…\uninst.exe" /S) through cmd, which understands its quoting.</summary>
