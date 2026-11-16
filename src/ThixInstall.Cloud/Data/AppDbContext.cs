@@ -94,6 +94,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, IHttpCo
             e.Property(x => x.Homepage).HasMaxLength(500);
             e.Property(x => x.WindowsMethod).HasConversion<int?>();
             e.Property(x => x.MacMethod).HasConversion<int?>();
+            e.Property(x => x.WindowsRoute).HasConversion<int?>();
+            e.Property(x => x.MacRoute).HasConversion<int?>();
             e.Property(x => x.WingetId).HasMaxLength(200);
             e.Property(x => x.ChocoId).HasMaxLength(200);
             e.Property(x => x.StoreId).HasMaxLength(40);

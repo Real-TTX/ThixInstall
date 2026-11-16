@@ -10,7 +10,7 @@ everything silently. With an account the bundle can also install **ThixInstall i
 account, shows updates, installs from the catalog and - with **Sync** on - runs the actions sent from the cloud (a simple
 Intune/Entra). **Profiles** bundle apps and scripts for devices and allow auto-enrollment with a key. Underneath it uses
 **winget / Chocolatey / Homebrew**; the cloud resolves the installers (winget manifests, Homebrew cask API) and **caches the
-downloads**; further sources are the **Microsoft Store**, direct downloads and **installers uploaded** to the cloud, and "App hinzufügen"
+downloads** - devices take the cache or the package manager first (a setting, per app overridable), the other one is the fallback; further sources are the **Microsoft Store**, direct downloads and **installers uploaded** to the cloud, and "App hinzufügen"
 searches all sources at once (`src/ThixInstall.Cloud/Business/Sources`). The design (data model, modes, installing) is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the server is
 [docs/CLOUD.md](docs/CLOUD.md). UI language German; code, comments and identifiers English.
 
@@ -56,7 +56,8 @@ src/ThixInstall.Core     (no UI)
                          catalog), BundleService (ticket, plan, run, install + enroll ThixInstall), InstallService (Windows:
                          Program Files, service "ThixInstall Agent", HKLM uninstall entry), UpdateService (OTA from GitHub),
                          AutostartService (HKLM/HKCU Run, LaunchAgent), AccessPolicy (policies), MacAppBundle, SettingsService
-  Installers/            WindowsInstaller (cached download → MSI/EXE/MSIX, else winget/choco (installs Chocolatey when missing)/msstore; silent uninstall), MacInstaller
+  Installers/            InstallRoutes (cache and package managers in the order of the plan, each the fallback of the other),
+                         WindowsInstaller (cached download → MSI/EXE/MSIX, winget/choco (installs Chocolatey when missing)/msstore; silent uninstall), MacInstaller
                          (DMG/ZIP → /Applications, PKG via installer, else brew), ScriptRunner, Downloads, JobContext/JobOutcome
   Agent/                 AgentClient (the app's way to the agent: in-process or named pipe "ThixInstall.Agent"), AgentProtocol,
                          AgentPipeServer (the service side; the caller's name and elevation), AgentWindowsService (--service)

@@ -18,9 +18,9 @@ public sealed class EditModel : AppPageModel
     public static readonly IReadOnlyList<Choice> WindowsMethods =
     [
         new(string.Empty, "Nicht für Windows"),
-        new("Winget", "winget", "Empfohlen: die Cloud lädt den Installer aus dem winget-Manifest und hält ihn im Cache"),
+        new("Winget", "winget", "Empfohlen: der Installer aus dem winget-Manifest über den Cache der Cloud, oder winget auf dem Gerät"),
         new("MicrosoftStore", "Microsoft Store", "Das Gerät installiert die App aus dem Store, als angemeldeter Benutzer"),
-        new("Chocolatey", "Chocolatey", "Das Gerät ruft choco auf (fehlt Chocolatey, richtet ThixInstall es ein)"),
+        new("Chocolatey", "Chocolatey", "Das Gerät ruft choco auf (fehlt Chocolatey, richtet ThixInstall es ein); winget als Ausweichweg"),
         new("Direct", "Direkter Download", "Eine Adresse und die Parameter für die stille Installation"),
         new("Upload", "Eigene Datei", "Ein Installer (MSI, EXE, MSIX), den du hier hochlädst"),
     ];
@@ -52,6 +52,8 @@ public sealed class EditModel : AppPageModel
     [BindProperty] public string WindowsMethod { get; set; } = string.Empty;
     [BindProperty] public string WingetId { get; set; } = string.Empty;
     [BindProperty] public string ChocoId { get; set; } = string.Empty;
+    [BindProperty] public string WindowsRoute { get; set; } = string.Empty;
+    [BindProperty] public string MacRoute { get; set; } = string.Empty;
     [BindProperty] public string StoreId { get; set; } = string.Empty;
     [BindProperty] public string DirectUrl { get; set; } = string.Empty;
     [BindProperty] public string DirectSilentArguments { get; set; } = string.Empty;
@@ -83,6 +85,11 @@ public sealed class EditModel : AppPageModel
     public DateTime? ResolvedDate { get; private set; }
 
     public IReadOnlyList<string> Categories { get; private set; } = [];
+
+    /// <summary>The ways a device tries first, Windows and macOS (the first choice names the setting of the cloud).</summary>
+    public IReadOnlyList<Choice> WindowsRoutes { get; private set; } = [];
+
+    public IReadOnlyList<Choice> MacRoutes { get; private set; } = [];
 
     public IReadOnlyList<ReleaseView> Releases { get; private set; } = [];
 
@@ -234,6 +241,7 @@ public sealed class EditModel : AppPageModel
         WindowsMethod = Enum.TryParse<InstallMethod>(WindowsMethod, out var w) ? w : null,
         WingetId = WingetId,
         ChocoId = ChocoId,
+        WindowsRoute = ParseRoute(WindowsRoute),
         StoreId = StoreId,
         DirectUrl = DirectUrl,
         DirectSilentArguments = DirectSilentArguments,
@@ -242,11 +250,14 @@ public sealed class EditModel : AppPageModel
         DetectDisplayName = DetectDisplayName,
         MacMethod = Enum.TryParse<InstallMethod>(MacMethod, out var m) ? m : null,
         BrewName = BrewName,
+        MacRoute = ParseRoute(MacRoute),
         MacDirectUrl = MacDirectUrl,
         MacDirectSha256 = MacDirectSha256,
         MacDirectVersion = MacDirectVersion,
         MacAppBundleName = MacAppBundleName,
     };
+
+    private static InstallRoute? ParseRoute(string value) => Enum.TryParse<InstallRoute>(value, out var route) && Enum.IsDefined(route) ? route : null;
 
     private async Task<byte[]?> ReadIconAsync()
     {
@@ -275,6 +286,19 @@ public sealed class EditModel : AppPageModel
         }
 
         var p = outcome.Value!;
+        var standard = (await SettingService.GetAsync(Db)).InstallRoute;
+        WindowsRoutes =
+        [
+            new(string.Empty, "Wie in den Einstellungen", standard == InstallRoute.PackageManager ? "Zurzeit: winget/Chocolatey zuerst" : "Zurzeit: Cloud-Cache zuerst"),
+            new(nameof(InstallRoute.CloudCache), "Cloud-Cache zuerst", "Die Cloud lädt den Installer einmal, die Geräte holen ihn von ihr; winget/Chocolatey als Ausweichweg"),
+            new(nameof(InstallRoute.PackageManager), "winget/Chocolatey zuerst", "Die Geräte laden selbst beim Hersteller; der Cloud-Cache als Ausweichweg"),
+        ];
+        MacRoutes =
+        [
+            new(string.Empty, "Wie in den Einstellungen", standard == InstallRoute.PackageManager ? "Zurzeit: Homebrew zuerst" : "Zurzeit: Cloud-Cache zuerst"),
+            new(nameof(InstallRoute.CloudCache), "Cloud-Cache zuerst", "Die Cloud lädt dmg, zip oder pkg einmal; Homebrew als Ausweichweg"),
+            new(nameof(InstallRoute.PackageManager), "Homebrew zuerst", "Die Geräte rufen brew auf; der Cloud-Cache als Ausweichweg"),
+        ];
         HasIcon = p.HasIcon;
         ResolvedDate = p.ResolvedDate;
         WindowsUploadFileName = p.WindowsUploadFileName;
@@ -294,6 +318,7 @@ public sealed class EditModel : AppPageModel
             WindowsMethod = p.WindowsMethod?.ToString() ?? string.Empty;
             WingetId = p.WingetId ?? string.Empty;
             ChocoId = p.ChocoId ?? string.Empty;
+            WindowsRoute = p.WindowsRoute?.ToString() ?? string.Empty;
             StoreId = p.StoreId ?? string.Empty;
             DirectUrl = p.DirectUrl ?? string.Empty;
             DirectSilentArguments = p.DirectSilentArguments ?? string.Empty;
@@ -302,6 +327,7 @@ public sealed class EditModel : AppPageModel
             DetectDisplayName = p.DetectDisplayName ?? string.Empty;
             MacMethod = p.MacMethod?.ToString() ?? string.Empty;
             BrewName = p.BrewName ?? string.Empty;
+            MacRoute = p.MacRoute?.ToString() ?? string.Empty;
             MacDirectUrl = p.MacDirectUrl ?? string.Empty;
             MacDirectSha256 = p.MacDirectSha256 ?? string.Empty;
             MacDirectVersion = p.MacDirectVersion ?? string.Empty;

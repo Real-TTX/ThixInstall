@@ -6,7 +6,8 @@ namespace ThixInstall.Core.Installers;
 /// <summary>
 /// Installs, updates and removes apps on macOS. A cask whose download the cloud resolved is installed without Homebrew:
 /// the .app of the disk image or zip is copied to /Applications, a .pkg goes through Apple's installer (which asks for an
-/// administrator). Without a download, and for formulae, Homebrew does it.
+/// administrator). Without a download, and for formulae, Homebrew does it; with both, the plan's <see cref="InstallPlan.Route"/> says which comes first
+/// and the other is the fallback (<see cref="InstallRoutes"/>).
 /// </summary>
 internal static class MacInstaller
 {
@@ -16,18 +17,19 @@ internal static class MacInstaller
     public static async Task<JobOutcome> InstallAsync(PackageDto package, bool isUpdate, JobContext context)
     {
         var plan = package.Install ?? throw new Models.BusinessException($"{package.Name} gibt es nicht für macOS.");
-        if (plan.DownloadUrl is not null && plan.InstallerKind is InstallerKind.Dmg or InstallerKind.Zip or InstallerKind.Pkg)
+
+        // the cached dmg/zip/pkg and Homebrew: the order of the plan, each one the fallback of the other
+        var routes = InstallRoutes.ForMac(plan, PackageManagers.Brew is not null);
+        if (routes.Count == 0)
         {
-            return await InstallDownloadAsync(package, plan, context);
+            return plan.Method is InstallMethod.Homebrew or InstallMethod.HomebrewCask
+                ? await BrewAsync(isUpdate ? "upgrade" : "install", plan.PackageId, plan.Method == InstallMethod.HomebrewCask, context)
+                : JobOutcome.Fail(context, $"Für {package.Name} ist kein Installer bekannt.");
         }
 
-        if (plan.Method is InstallMethod.Homebrew or InstallMethod.HomebrewCask)
-        {
-            var cask = plan.Method == InstallMethod.HomebrewCask;
-            return await BrewAsync(isUpdate ? "upgrade" : "install", plan.PackageId, cask, context);
-        }
-
-        return JobOutcome.Fail(context, $"Für {package.Name} ist kein Installer bekannt.");
+        return await InstallRoutes.RunAsync(routes, route => route == InstallRouteStep.Cache
+            ? InstallDownloadAsync(package, plan, context)
+            : BrewAsync(isUpdate ? "upgrade" : "install", plan.PackageId, plan.Method == InstallMethod.HomebrewCask, context), context);
     }
 
     public static async Task<JobOutcome> UninstallAsync(PackageDto package, InstalledEntry? installed, JobContext context)

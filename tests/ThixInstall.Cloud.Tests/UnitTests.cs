@@ -261,6 +261,6 @@ public sealed class UnitTests
     public void TheContractJsonUsesCamelCaseAndEnumNames()
     {
         var json = System.Text.Json.JsonSerializer.Serialize(new InstallPlan { Method = InstallMethod.HomebrewCask, InstallerKind = InstallerKind.Dmg }, ApiContract.Json);
-        Assert.Equal("""{"method":"HomebrewCask","installerKind":"Dmg"}""", json);
+        Assert.Equal("""{"method":"HomebrewCask","route":"CloudCache","installerKind":"Dmg"}""", json);
     }
 }

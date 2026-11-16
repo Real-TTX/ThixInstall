@@ -5,7 +5,7 @@ using ThixInstall.Cloud.Controls;
 namespace ThixInstall.Cloud.Pages.Admin.Settings;
 
 /// <summary>
-/// The settings of the cloud with its areas as tabs: Allgemein (public catalog, cache size), Desktop-App (the channel the desktop packages come from,
+/// The settings of the cloud with its areas as tabs: Allgemein (public catalog, cache size, the way devices install first), Desktop-App (the channel the desktop packages come from,
 /// uploads that replace them), Quellen (the GitHub token of the winget resolver).
 /// </summary>
 public sealed class IndexModel : AppPageModel
@@ -16,8 +16,18 @@ public sealed class IndexModel : AppPageModel
         new("nightly", "Nightly", "Die Entwicklungsversionen (Branch dev)"),
     ];
 
+    public static readonly IReadOnlyList<Choice> InstallRoutes =
+    [
+        new(nameof(global::ThixInstall.Shared.InstallRoute.CloudCache), "Cloud-Cache zuerst",
+            "Die Cloud lädt jeden Installer einmal und hält ihn bereit, die Geräte holen ihn von ihr. Spart Bandbreite bei vielen Geräten. winget, Chocolatey und Homebrew sind der Ausweichweg."),
+        new(nameof(global::ThixInstall.Shared.InstallRoute.PackageManager), "winget/Chocolatey/Homebrew zuerst",
+            "Die Geräte laden selbst beim Hersteller, ohne auf die Cloud zu warten. Der Cloud-Cache ist der Ausweichweg."),
+    ];
+
     [BindProperty(SupportsGet = true)]
     public string Tab { get; set; } = "general";
+
+    [BindProperty] public string InstallRoute { get; set; } = nameof(global::ThixInstall.Shared.InstallRoute.CloudCache);
 
     [BindProperty] public bool PublicCatalog { get; set; }
     [BindProperty] public int CacheMaxGigabytes { get; set; }
@@ -39,7 +49,8 @@ public sealed class IndexModel : AppPageModel
     public async Task<IActionResult> OnPostAsync()
     {
         Tab = "general";
-        return await AfterAsync(await SettingService.SaveGeneralAsync(Db, Actor, PublicCatalog, CacheMaxGigabytes));
+        return await AfterAsync(await SettingService.SaveGeneralAsync(Db, Actor, PublicCatalog, CacheMaxGigabytes,
+            Enum.TryParse<global::ThixInstall.Shared.InstallRoute>(InstallRoute, out var route) ? route : (global::ThixInstall.Shared.InstallRoute)0));
     }
 
     public async Task<IActionResult> OnPostChannelAsync()
@@ -101,6 +112,7 @@ public sealed class IndexModel : AppPageModel
         {
             PublicCatalog = settings.PublicCatalog;
             CacheMaxGigabytes = settings.CacheMaxGigabytes;
+            InstallRoute = settings.InstallRoute.ToString();
             DesktopChannel = settings.DesktopChannel;
         }
 

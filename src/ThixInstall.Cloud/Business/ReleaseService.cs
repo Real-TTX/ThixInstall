@@ -282,8 +282,12 @@ public static class ReleaseService
         }).ToList();
     }
 
-    /// <summary>The plan of a release for a device (or the command line of the method when there is no release yet).</summary>
-    public static InstallPlan? Plan(Package package, PackageRelease? release, TargetOs os)
+    /// <summary>
+    /// The plan of a release for a device (or the command line of the method when there is no release yet). It carries both ways - the cached installer
+    /// and the package managers (Windows: winget and Chocolatey ids as far as known) - and which one comes first: the app's own choice or else
+    /// <paramref name="defaultRoute"/>, the setting of the cloud.
+    /// </summary>
+    public static InstallPlan? Plan(Package package, PackageRelease? release, TargetOs os, InstallRoute defaultRoute = InstallRoute.CloudCache)
     {
         var method = os == TargetOs.Windows ? package.WindowsMethod : package.MacMethod;
         if (method is null)
@@ -299,10 +303,21 @@ public static class ReleaseService
             InstallMethod.Homebrew or InstallMethod.HomebrewCask => package.BrewName,
             _ => null,
         };
+        var windowsManagers = os == TargetOs.Windows && method is InstallMethod.Winget or InstallMethod.Chocolatey;
+        var route = (os == TargetOs.Windows ? package.WindowsRoute : package.MacRoute) ?? defaultRoute;
         if (release is null || release.Method != method)
         {
             // a download or an upload needs its release (the address in the cloud); the package managers work without one
-            return method is InstallMethod.Direct or InstallMethod.Upload ? null : new InstallPlan { Method = method.Value, PackageId = packageId };
+            return method is InstallMethod.Direct or InstallMethod.Upload
+                ? null
+                : new InstallPlan
+                {
+                    Method = method.Value,
+                    PackageId = packageId,
+                    Route = route,
+                    WingetId = windowsManagers ? package.WingetId : null,
+                    ChocoId = windowsManagers ? package.ChocoId : null,
+                };
         }
 
         var download = release.InstallerUrl is not null && release.InstallerKind is not null;
@@ -310,6 +325,9 @@ public static class ReleaseService
         {
             Method = method.Value,
             PackageId = packageId,
+            Route = route,
+            WingetId = windowsManagers ? package.WingetId : null,
+            ChocoId = windowsManagers ? package.ChocoId : null,
             Version = release.Version,
             DownloadUrl = download ? ApiContract.Download(release.Id) : null,
             FileName = download ? release.FileName : null,

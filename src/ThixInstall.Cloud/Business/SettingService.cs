@@ -1,15 +1,17 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using ThixInstall.Cloud.Data;
+using ThixInstall.Shared;
 
 namespace ThixInstall.Cloud.Business;
 
 /// <summary>The settings of the cloud as the pages show them.</summary>
-public sealed record CloudSettings(bool PublicCatalog, int CacheMaxGigabytes, string DesktopChannel, string? GitHubToken);
+public sealed record CloudSettings(bool PublicCatalog, int CacheMaxGigabytes, string DesktopChannel, string? GitHubToken, InstallRoute InstallRoute = InstallRoute.CloudCache);
 
 /// <summary>
-/// The settings of the cloud (table <c>Setting</c>): whether anonymous visitors see the catalog, the size of the download cache, the channel the
-/// desktop packages come from, the GitHub token of the resolvers. Read often, so kept in memory until they change.
+/// The settings of the cloud (table <c>Setting</c>): whether anonymous visitors see the catalog, the size of the download cache, the way devices
+/// try first for apps of the package managers (cloud cache or winget/Chocolatey/Homebrew), the channel the desktop packages come from, the GitHub
+/// token of the resolvers. Read often, so kept in memory until they change.
 /// </summary>
 public static class SettingService
 {
@@ -17,6 +19,7 @@ public static class SettingService
     public const string CacheMaxKey = "CacheMaxGigabytes";
     public const string DesktopChannelKey = "DesktopChannel";
     public const string GitHubTokenKey = "GitHubToken";
+    public const string InstallRouteKey = "InstallRoute";
     public const string SeededKey = "Seeded";
 
     public const int DefaultCacheGigabytes = 20;
@@ -38,12 +41,14 @@ public static class SettingService
             !all.TryGetValue(PublicCatalogKey, out var pub) || pub != "false",
             all.TryGetValue(CacheMaxKey, out var max) && int.TryParse(max, CultureInfo.InvariantCulture, out var gb) && gb > 0 ? gb : DefaultCacheGigabytes,
             all.TryGetValue(DesktopChannelKey, out var channel) && channel is "release" or "nightly" ? channel : OwnChannel,
-            all.TryGetValue(GitHubTokenKey, out var token) && token.Length > 0 ? token : null);
+            all.TryGetValue(GitHubTokenKey, out var token) && token.Length > 0 ? token : null,
+            all.TryGetValue(InstallRouteKey, out var route) && Enum.TryParse<InstallRoute>(route, out var parsed) && Enum.IsDefined(parsed) ? parsed : InstallRoute.CloudCache);
         _cached = settings;
         return settings;
     }
 
-    public static async Task<Outcome> SaveGeneralAsync(AppDbContext db, Actor actor, bool publicCatalog, int cacheMaxGigabytes)
+    /// <summary>The tab "Allgemein"; <paramref name="installRoute"/> is the way devices try first (null = keep the current one).</summary>
+    public static async Task<Outcome> SaveGeneralAsync(AppDbContext db, Actor actor, bool publicCatalog, int cacheMaxGigabytes, InstallRoute? installRoute = null)
     {
         UserService.RequireAdmin(actor);
         if (cacheMaxGigabytes is < 1 or > 10_000)
@@ -51,8 +56,17 @@ public static class SettingService
             return Outcome.Fail("Die Größe des Caches liegt zwischen 1 und 10.000 GB.", "CacheMaxGigabytes");
         }
 
+        if (installRoute is { } unknown && !Enum.IsDefined(unknown))
+        {
+            return Outcome.Fail("Bitte einen Weg wählen.", "InstallRoute");
+        }
+
         await SetAsync(db, PublicCatalogKey, publicCatalog ? "true" : "false");
         await SetAsync(db, CacheMaxKey, cacheMaxGigabytes.ToString(CultureInfo.InvariantCulture));
+        if (installRoute is { } route)
+        {
+            await SetAsync(db, InstallRouteKey, route.ToString());
+        }
         return Outcome.Success();
     }
 

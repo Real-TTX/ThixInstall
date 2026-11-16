@@ -79,10 +79,10 @@ wwwroot/                matui/ (Kopie), css/app.css (Akzent #0F7B6C, Präfix ti-
 | `/Actions` | wie Geräte | alle Aufträge mit Filter Status/Herkunft; Detail mit Ausgabe, Abbrechen (wartend) |
 | `/Bundles` | eigene, Admin alle/anonyme | Pakete mit Downloads; Detail, Löschen |
 | `/Catalog/Packages/Add` | Admin | „App hinzufügen“: Name suchen; Treffer je System (Windows: winget, Microsoft Store, Chocolatey; macOS: Cask, Formel) in Gruppen je Quelle, die beste Quelle zuerst, Vorschlag vorgewählt, Vorhandenes verlinkt; Kategorie; „App anlegen“ füllt alles aus den Quellen, holt das Icon und löst auf |
-| `/Catalog/Packages` | Admin | Apps; Bearbeiten mit Tabs Allgemein (Icon, sichtbar, beliebt) · Windows (winget/Store/Chocolatey/Direkt/eigene Datei, Erkennung) · macOS (Cask/Formel/Direkt/eigene Datei) · Versionen („Jetzt auflösen“); „Alle auflösen“ |
+| `/Catalog/Packages` | Admin | Apps; Bearbeiten mit Tabs Allgemein (Icon, sichtbar, beliebt) · Windows (winget/Store/Chocolatey/Direkt/eigene Datei, Weg auf dem Gerät, Erkennung) · macOS (Cask/Formel/Direkt/eigene Datei, Weg) · Versionen („Jetzt auflösen“); „Alle auflösen“ |
 | `/Catalog/Scripts` | Admin | Skripte; Tabs Allgemein · Skript (Shell, Kontext System/Benutzer, Text, Zeitgrenze) |
 | `/Profiles` | Admin | Tabs Allgemein · Inhalte (Reihenfolge) · Geräte („Auftrag an alle“) · Registrierung (Schlüssel, stille Installation, Download) |
-| `/Admin/Users`, `/Admin/Cache`, `/Admin/Settings` | Admin | Benutzer; Cache (Belegung, löschen, leeren); Einstellungen: Allgemein (öffentlicher Katalog, Cache-Größe) · Desktop-App (Kanal, Uploads) · Quellen (GitHub-Token) |
+| `/Admin/Users`, `/Admin/Cache`, `/Admin/Settings` | Admin | Benutzer; Cache (Belegung, löschen, leeren); Einstellungen: Allgemein (öffentlicher Katalog, Cache-Größe, Weg zuerst: Cloud-Cache oder Paketmanager) · Desktop-App (Kanal, Uploads) · Quellen (GitHub-Token) |
 
 ## API
 
@@ -125,12 +125,17 @@ CacheMaxGigabytes, DesktopChannel, GitHubToken, Seeded).
   `/data/sources` und werden höchstens täglich neu geladen (beim Öffnen der Seite angestoßen; die alte Liste dient, bis die neue da ist); Store
   und Chocolatey werden live gefragt. Antworten bleiben 5 Minuten gemerkt.
 - Der Cache prüft die SHA-256 des Releases; passt sie nicht, wird die Datei verworfen. Ein Schloss pro Adresse verhindert doppelte Downloads.
+- Der `InstallPlan` trägt Cache und Paketmanager (`WingetId`, `ChocoId`) und den Weg, den das Gerät zuerst nimmt (`Route`): die Wahl der App
+  (`Package.WindowsRoute`/`MacRoute`, leer = Einstellung) oder die Einstellung `InstallRoute` (Standard: Cloud-Cache zuerst). Bei winget als
+  Quelle ist die Chocolatey-Id der Ausweichweg (optional, geprüft); bei Chocolatey als Quelle die winget-Id, soweit bekannt.
 - Icons: einmal pro Paket `apple-touch-icon.png`, dann `favicon.ico` der Homepage (nur echte Bilder, erkannt an den ersten Bytes); hochgeladene
   SVGs ohne `<script>` und mit eigener CSP ausgeliefert.
 
 ## Bekannte Grenzen
 
 - Chocolatey, Homebrew-Formeln und der Microsoft Store laufen immer über die Kommandozeile des Geräts (kein Cache).
+- Beim ersten Abruf einer Datei lädt die Cloud sie ganz von der Quelle, bevor das Gerät das erste Byte bekommt (mit „winget/Chocolatey/Homebrew
+  zuerst“ lädt das Gerät selbst beim Hersteller).
 - Eigene Dateien bis 2 GB (nur auf der Bearbeiten-Seite; sonst gilt die Grenze von 402 MB). Ein Reverse-Proxy davor braucht dieselbe Grenze.
 - Ohne veröffentlichten Desktop-Build (GitHub-Release des Kanals) oder Upload unter Einstellungen › Desktop-App gibt es keinen Paket-Download;
   die Paketseite sagt das.

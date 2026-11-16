@@ -29,6 +29,8 @@ public sealed record PackageInput
     public InstallMethod? WindowsMethod { get; init; }
     public string? WingetId { get; init; }
     public string? ChocoId { get; init; }
+    /// <summary>Windows: the way devices try first; null = the setting of the cloud.</summary>
+    public InstallRoute? WindowsRoute { get; init; }
     public string? StoreId { get; init; }
     public string? StorePackageFamilyName { get; init; }
     public string? DirectUrl { get; init; }
@@ -40,6 +42,8 @@ public sealed record PackageInput
     public string? DetectDisplayName { get; init; }
     public InstallMethod? MacMethod { get; init; }
     public string? BrewName { get; init; }
+    /// <summary>macOS: the way devices try first for a cask; null = the setting of the cloud.</summary>
+    public InstallRoute? MacRoute { get; init; }
     public string? MacDirectUrl { get; init; }
     public string? MacDirectSha256 { get; init; }
     public string? MacDirectVersion { get; init; }
@@ -112,12 +116,13 @@ public static class CatalogService
             .ToListAsync(ct);
         var ids = rows.Select(r => r.Package.Id).ToList();
         var releases = await db.Releases.AsNoTracking().Where(r => ids.Contains(r.PackageId) && r.Os == os && r.Architecture == architecture).ToListAsync(ct);
-        return rows.Select(r => ToDto(r.Package, r.HasIcon, releases.FirstOrDefault(x => x.PackageId == r.Package.Id), os))
+        var route = (await SettingService.GetAsync(db, ct)).InstallRoute;
+        return rows.Select(r => ToDto(r.Package, r.HasIcon, releases.FirstOrDefault(x => x.PackageId == r.Package.Id), os, route))
             .Where(p => p.Install is not null)
             .ToList();
     }
 
-    public static PackageDto ToDto(Package p, bool hasIcon, PackageRelease? release, TargetOs os) => new()
+    public static PackageDto ToDto(Package p, bool hasIcon, PackageRelease? release, TargetOs os, InstallRoute defaultRoute = InstallRoute.CloudCache) => new()
     {
         Id = p.Id,
         Key = p.Key,
@@ -130,7 +135,7 @@ public static class CatalogService
         IsFeatured = p.IsFeatured,
         IsPublic = p.IsPublic,
         LatestVersion = release?.Method == (os == TargetOs.Windows ? p.WindowsMethod : p.MacMethod) ? release?.Version : null,
-        Install = ReleaseService.Plan(p, release, os),
+        Install = ReleaseService.Plan(p, release, os, defaultRoute),
         Detection = os == TargetOs.Windows
             ? new DetectionRule
             {
@@ -274,6 +279,7 @@ public static class CatalogService
         {
             Id = p.Id, Key = p.Key, Name = p.Name, Publisher = p.Publisher, Description = p.Description, Category = p.Category, Homepage = p.Homepage,
             IsPublic = p.IsPublic, IsFeatured = p.IsFeatured, SortOrder = p.SortOrder, WindowsMethod = p.WindowsMethod, WingetId = p.WingetId, ChocoId = p.ChocoId,
+            WindowsRoute = p.WindowsRoute, MacRoute = p.MacRoute,
             StoreId = p.StoreId, StorePackageFamilyName = p.StorePackageFamilyName,
             DirectUrl = p.DirectUrl, DirectSilentArguments = p.DirectSilentArguments, DirectSha256 = p.DirectSha256, DirectVersion = p.DirectVersion,
             WindowsUploadFileName = p.WindowsUploadFileName, DetectDisplayName = p.DetectDisplayName, MacMethod = p.MacMethod, BrewName = p.BrewName,
@@ -369,6 +375,12 @@ public static class CatalogService
                     return Outcome<string>.Fail("Die winget-Id hat die Form Herausgeber.Name, z. B. Mozilla.Firefox.", "WingetId");
                 }
 
+                // the Chocolatey id is the fallback here: optional, but valid when given
+                if (Text.Clean(input.ChocoId, 200) is { } fallback && !ChocolateySource.IsValidId(fallback))
+                {
+                    return Outcome<string>.Fail("Die Chocolatey-Id besteht aus Buchstaben, Ziffern, . - _.", "ChocoId");
+                }
+
                 break;
             case InstallMethod.MicrosoftStore:
                 if (!StoreSource.IsValidId(Text.Clean(input.StoreId, 40)))
@@ -421,6 +433,7 @@ public static class CatalogService
         package.WindowsMethod = input.WindowsMethod;
         package.WingetId = Text.Clean(input.WingetId, 200);
         package.ChocoId = Text.Clean(input.ChocoId, 200);
+        package.WindowsRoute = input.WindowsRoute;
         var storeId = Text.Clean(input.StoreId, 40)?.ToUpperInvariant();
         if (storeId != package.StoreId)
         {
@@ -539,6 +552,7 @@ public static class CatalogService
         var oldUpload = package.MacUploadSha256;
         package.MacMethod = input.MacMethod;
         package.BrewName = Text.Clean(input.BrewName, 200);
+        package.MacRoute = input.MacRoute;
         package.MacDirectUrl = Text.Clean(input.MacDirectUrl, 1000);
         package.MacDirectSha256 = Text.Clean(input.MacDirectSha256, 64)?.ToLowerInvariant();
         package.MacDirectVersion = Text.Clean(input.MacDirectVersion, 60);

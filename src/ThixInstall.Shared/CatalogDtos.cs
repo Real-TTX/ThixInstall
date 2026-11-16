@@ -50,7 +50,8 @@ public sealed record PackageDto
 /// <summary>
 /// How a device installs a package. With a <see cref="DownloadUrl"/> the device downloads the installer from the cloud
 /// (cache), checks <see cref="Sha256"/> and starts it by <see cref="InstallerKind"/> with <see cref="SilentArguments"/>;
-/// without one it runs the package manager of <see cref="Method"/> with <see cref="PackageId"/>.
+/// without one it runs the package manager of <see cref="Method"/> with <see cref="PackageId"/>. Both ways are possible: <see cref="Route"/>
+/// says which comes first, the other one (and on Windows the second package manager, <see cref="WingetId"/> / <see cref="ChocoId"/>) is the fallback.
 /// </summary>
 public sealed record InstallPlan
 {
@@ -58,6 +59,15 @@ public sealed record InstallPlan
 
     /// <summary>The id at the package manager: winget id ("Mozilla.Firefox"), choco id, brew formula or cask name.</summary>
     public string? PackageId { get; init; }
+
+    /// <summary>Which way comes first: the cached installer or the package manager on the device.</summary>
+    public InstallRoute Route { get; init; } = InstallRoute.CloudCache;
+
+    /// <summary>Windows: the winget id, also when another source is the main one (a fallback).</summary>
+    public string? WingetId { get; init; }
+
+    /// <summary>Windows: the Chocolatey id, also when another source is the main one (a fallback).</summary>
+    public string? ChocoId { get; init; }
 
     /// <summary>The version this plan installs (null = whatever is newest at the package manager).</summary>
     public string? Version { get; init; }

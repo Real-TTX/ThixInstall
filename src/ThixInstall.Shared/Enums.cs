@@ -38,6 +38,16 @@ public enum InstallMethod
     Upload = 7,
 }
 
+/// <summary>
+/// The way a device tries first for an app of a package manager (winget, Chocolatey, Homebrew): the installer from the cloud's cache or the package
+/// manager on the device, which downloads from the maker itself. The other way is the fallback when the first fails.
+/// </summary>
+public enum InstallRoute
+{
+    CloudCache = 1,
+    PackageManager = 2,
+}
+
 /// <summary>What a downloaded installer is, which decides how the device starts it.</summary>
 public enum InstallerKind
 {

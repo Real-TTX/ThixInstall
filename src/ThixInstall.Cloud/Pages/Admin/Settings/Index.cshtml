@@ -108,6 +108,8 @@
                     <ti-field name="PublicCatalog" kind="switch" label="Startseite öffentlich: Besucher ohne Konto stellen Pakete aus den öffentlichen Apps zusammen" value="@Model.PublicCatalog.ToString()" />
                     <ti-field name="CacheMaxGigabytes" kind="number" label="Größe des Download-Caches in GB" value="@Model.CacheMaxGigabytes" required
                               hint="Darüber gehen die Dateien, die am längsten nicht gebraucht wurden." />
+                    <ti-field name="InstallRoute" kind="radios" label="Woher die Geräte die Apps zuerst holen" value="@Model.InstallRoute" options="IndexModel.InstallRoutes"
+                              hint="Gilt für Apps aus winget, Chocolatey und Homebrew-Casks. Klappt der erste Weg nicht, nimmt das Gerät den anderen. Einzelne Apps können es anders festlegen." />
                 </div>
             </div>
             <ti-buttons save="Speichern" />

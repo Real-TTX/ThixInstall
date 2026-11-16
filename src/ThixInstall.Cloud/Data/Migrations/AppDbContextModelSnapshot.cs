@@ -489,6 +489,9 @@ namespace ThixInstall.Cloud.Data.Migrations
                     b.Property<int?>("MacMethod")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("MacRoute")
+                        .HasColumnType("integer");
+
                     b.Property<string>("MacUploadFileName")
                         .HasMaxLength(260)
                         .HasColumnType("character varying(260)");
@@ -530,6 +533,9 @@ namespace ThixInstall.Cloud.Data.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<int?>("WindowsMethod")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("WindowsRoute")
                         .HasColumnType("integer");
 
                     b.Property<string>("WindowsUploadFileName")

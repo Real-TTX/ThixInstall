@@ -107,6 +107,9 @@ public sealed class Package : SoftEntity
 
     public string? ChocoId { get; set; }
 
+    /// <summary>Windows: the way a device tries first (cloud cache or winget/Chocolatey); null = the setting of the cloud.</summary>
+    public InstallRoute? WindowsRoute { get; set; }
+
     /// <summary>The id of an app in the Microsoft Store ("9NKSQGP7F2NH", "XP…").</summary>
     public string? StoreId { get; set; }
 
@@ -135,6 +138,9 @@ public sealed class Package : SoftEntity
     public InstallMethod? MacMethod { get; set; }
 
     public string? BrewName { get; set; }
+
+    /// <summary>macOS: the way a device tries first for a cask (cloud cache or Homebrew); null = the setting of the cloud.</summary>
+    public InstallRoute? MacRoute { get; set; }
 
     /// <summary>A direct download for macOS: a dmg, pkg or zip.</summary>
     public string? MacDirectUrl { get; set; }

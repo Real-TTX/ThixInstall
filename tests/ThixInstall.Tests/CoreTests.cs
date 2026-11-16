@@ -147,6 +147,56 @@ public sealed class CoreTests
     }
 
     [Fact]
+    public void Cache_and_package_managers_are_tried_in_the_order_of_the_plan()
+    {
+        var cached = new InstallPlan
+        {
+            Method = InstallMethod.Winget, PackageId = "Mozilla.Firefox", WingetId = "Mozilla.Firefox", ChocoId = "firefox",
+            DownloadUrl = "/api/v1/downloads/7", InstallerKind = InstallerKind.Exe,
+        };
+        Assert.Equal([InstallRouteStep.Cache, InstallRouteStep.Winget, InstallRouteStep.Chocolatey], InstallRoutes.ForWindows(cached, hasWinget: true));
+        Assert.Equal([InstallRouteStep.Winget, InstallRouteStep.Chocolatey, InstallRouteStep.Cache],
+            InstallRoutes.ForWindows(cached with { Route = InstallRoute.PackageManager }, hasWinget: true));
+        Assert.Equal([InstallRouteStep.Cache, InstallRouteStep.Chocolatey], InstallRoutes.ForWindows(cached, hasWinget: false));
+
+        // Chocolatey as the source: choco first, winget as its fallback; no download yet: only the package managers
+        var choco = new InstallPlan { Method = InstallMethod.Chocolatey, PackageId = "7zip", WingetId = "7zip.7zip" };
+        Assert.Equal([InstallRouteStep.Chocolatey, InstallRouteStep.Winget], InstallRoutes.ForWindows(choco, hasWinget: true));
+        Assert.Equal("7zip", InstallRoutes.ChocoIdOf(choco));
+
+        // an older cloud sends neither the ids nor the order: the plan's own manager and the cache first, as before
+        var old = new InstallPlan { Method = InstallMethod.Winget, PackageId = "Git.Git", DownloadUrl = "/api/v1/downloads/9", InstallerKind = InstallerKind.Exe };
+        Assert.Equal([InstallRouteStep.Cache, InstallRouteStep.Winget], InstallRoutes.ForWindows(old, hasWinget: true));
+
+        var cask = new InstallPlan
+        {
+            Method = InstallMethod.HomebrewCask, PackageId = "firefox", DownloadUrl = "/api/v1/downloads/8", InstallerKind = InstallerKind.Dmg,
+            Route = InstallRoute.PackageManager,
+        };
+        Assert.Equal([InstallRouteStep.Homebrew, InstallRouteStep.Cache], InstallRoutes.ForMac(cask, hasBrew: true));
+        Assert.Equal([InstallRouteStep.Cache], InstallRoutes.ForMac(cask, hasBrew: false));
+    }
+
+    [Fact]
+    public async Task A_failing_way_hands_over_to_the_next_one()
+    {
+        var context = new JobContext(null, null, (_, _) => { }, CancellationToken.None);
+        var tried = new List<InstallRouteStep>();
+        var outcome = await InstallRoutes.RunAsync([InstallRouteStep.Cache, InstallRouteStep.Winget, InstallRouteStep.Chocolatey], route =>
+        {
+            tried.Add(route);
+            return route == InstallRouteStep.Cache
+                ? throw new HttpRequestException("Die Cloud antwortet nicht.")
+                : Task.FromResult(route == InstallRouteStep.Winget ? JobOutcome.Fail(context, "Fehlercode 1.") : new JobOutcome(true, 0, context.Combine("ok")));
+        }, context);
+
+        Assert.True(outcome.Succeeded);
+        Assert.Equal([InstallRouteStep.Cache, InstallRouteStep.Winget, InstallRouteStep.Chocolatey], tried);
+        Assert.Contains("Der Installer aus der Cloud hat nicht geklappt (Die Cloud antwortet nicht.) – versuche winget", outcome.Output);
+        Assert.Contains("winget hat nicht geklappt (Fehlercode 1.) – versuche Chocolatey", outcome.Output);
+    }
+
+    [Fact]
     public void The_catalog_view_shows_installed_apps_and_updates()
     {
         using var data = new TestData();

@@ -398,6 +398,43 @@ public sealed class SourceTests
         Assert.Equal("2.0", dto.LatestVersion);
     }
 
+    [DbFact]
+    public async Task PlansCarryCacheAndPackageManagersAndTheWayFirstFromTheSettingOrTheApp()
+    {
+        await using var test = await TestDatabase.CreateAsync();
+        var admin = await test.AddUserAsync("admin", admin: true);
+        var actor = new Actor(admin.Id, true);
+        var id = (await CatalogService.SaveGeneralAsync(test.NewContext(), actor, new PackageInput { Name = "7-Zip", Category = "Werkzeuge" })).Value;
+        await CatalogService.SaveWindowsAsync(test.NewContext(), actor, new PackageInput
+        {
+            Id = id, WindowsMethod = InstallMethod.Chocolatey, ChocoId = "7zip", WingetId = "7zip.7zip",
+        });
+
+        async Task<InstallPlan> PlanAsync() =>
+            Assert.Single((await CatalogService.CatalogAsync(test.NewContext(), null, TargetOs.Windows, CpuArchitecture.X64)).Packages).Install!;
+
+        var plan = await PlanAsync();
+        Assert.Equal(("7zip", "7zip.7zip", InstallRoute.CloudCache), (plan.ChocoId, plan.WingetId, plan.Route));
+
+        // the setting of the cloud, then the app's own choice above it
+        Assert.Equal("InstallRoute", (await SettingService.SaveGeneralAsync(test.NewContext(), actor, true, 20, (InstallRoute)0)).Field);
+        Assert.True((await SettingService.SaveGeneralAsync(test.NewContext(), actor, true, 20, InstallRoute.PackageManager)).Ok);
+        Assert.Equal(InstallRoute.PackageManager, (await PlanAsync()).Route);
+        await CatalogService.SaveWindowsAsync(test.NewContext(), actor, new PackageInput
+        {
+            Id = id, WindowsMethod = InstallMethod.Chocolatey, ChocoId = "7zip", WingetId = "7zip.7zip", WindowsRoute = InstallRoute.CloudCache,
+        });
+        Assert.Equal(InstallRoute.CloudCache, (await PlanAsync()).Route);
+        Assert.Equal(InstallRoute.CloudCache, (await CatalogService.GetPackageAsync(test.NewContext(), actor, id)).Value!.WindowsRoute);
+
+        // with winget as the source the Chocolatey id is the fallback: optional, but checked
+        var invalid = await CatalogService.SaveWindowsAsync(test.NewContext(), actor, new PackageInput
+        {
+            Id = id, WindowsMethod = InstallMethod.Winget, WingetId = "7zip.7zip", ChocoId = "not valid!",
+        });
+        Assert.Equal("ChocoId", invalid.Field);
+    }
+
     private static void UseSources(IReadOnlyList<SourceHit>? winget = null, IReadOnlyList<SourceHit>? store = null, IReadOnlyList<SourceHit>? choco = null,
         IReadOnlyList<SourceHit>? casks = null, IReadOnlyList<SourceHit>? formulae = null)
     {

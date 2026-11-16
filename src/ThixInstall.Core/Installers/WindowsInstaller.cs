@@ -6,9 +6,9 @@ using ThixInstall.Shared;
 namespace ThixInstall.Core.Installers;
 
 /// <summary>
-/// Installs, updates and removes apps on Windows: the installer from the cloud's cache (MSI, EXE, MSIX) when the plan has
-/// one, otherwise winget, Chocolatey (installed first when it is missing) or the Microsoft Store (as the user). Updating is installing the newer version over the old one (what every one of
-/// these installers does).
+/// Installs, updates and removes apps on Windows: the installer from the cloud's cache (MSI, EXE, MSIX) and winget / Chocolatey (installed first when
+/// it is missing) in the order of the plan (<see cref="InstallRoutes"/>: when one way fails the next follows), or the Microsoft Store (as the user).
+/// Updating is installing the newer version over the old one (what every one of these installers does).
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal static partial class WindowsInstaller
@@ -24,18 +24,27 @@ internal static partial class WindowsInstaller
     public static async Task<JobOutcome> InstallAsync(PackageDto package, bool isUpdate, JobContext context)
     {
         var plan = package.Install ?? throw new Models.BusinessException($"{package.Name} gibt es nicht für Windows.");
-        if (plan.DownloadUrl is not null && plan.InstallerKind is not null)
+        if (plan.Method == InstallMethod.MicrosoftStore)
         {
-            return await InstallDownloadAsync(package, plan, context);
+            return await StoreAsync(isUpdate ? "upgrade" : "install", plan.PackageId, context);
         }
 
-        return plan.Method switch
+        // the cached installer and winget / Chocolatey: the order of the plan, each one the fallback of the other
+        var routes = InstallRoutes.ForWindows(plan, PackageManagers.Winget is not null);
+        if (routes.Count == 0)
         {
-            InstallMethod.Winget => await WingetAsync(isUpdate ? "upgrade" : "install", plan.PackageId, context),
-            InstallMethod.Chocolatey => await ChocolateyAsync(isUpdate ? "upgrade" : "install", plan.PackageId, context),
-            InstallMethod.MicrosoftStore => await StoreAsync(isUpdate ? "upgrade" : "install", plan.PackageId, context),
-            _ => JobOutcome.Fail(context, $"Für {package.Name} ist kein Installer bekannt."),
-        };
+            return JobOutcome.Fail(context, PackageManagers.Winget is null && InstallRoutes.WingetIdOf(plan) is not null
+                ? "winget (App-Installer) ist auf diesem Gerät nicht installiert."
+                : $"Für {package.Name} ist kein Installer bekannt.");
+        }
+
+        var verb = isUpdate ? "upgrade" : "install";
+        return await InstallRoutes.RunAsync(routes, route => route switch
+        {
+            InstallRouteStep.Cache => InstallDownloadAsync(package, plan, context),
+            InstallRouteStep.Winget => WingetAsync(verb, InstallRoutes.WingetIdOf(plan), context),
+            _ => ChocolateyAsync(verb, InstallRoutes.ChocoIdOf(plan), context),
+        }, context);
     }
 
     public static async Task<JobOutcome> UninstallAsync(PackageDto package, InstalledEntry? installed, JobContext context)
@@ -61,14 +70,20 @@ internal static partial class WindowsInstaller
             return Outcome(result, context, SuccessCodes);
         }
 
-        if (plan?.Method == InstallMethod.Winget && plan.PackageId is not null && PackageManagers.Winget is not null)
+        // Chocolatey removes its own apps (so it does not keep them as installed)
+        if (plan?.Method == InstallMethod.Chocolatey && InstallRoutes.ChocoIdOf(plan) is { } ownChocoId && PackageManagers.Chocolatey is not null)
         {
-            return await WingetAsync("uninstall", plan.PackageId, context);
+            return await ChocolateyAsync("uninstall", ownChocoId, context);
         }
 
-        if (plan?.Method == InstallMethod.Chocolatey && plan.PackageId is not null && PackageManagers.Chocolatey is not null)
+        if (plan is not null && InstallRoutes.WingetIdOf(plan) is { } wingetId && PackageManagers.Winget is not null)
         {
-            return await ChocolateyAsync("uninstall", plan.PackageId, context);
+            return await WingetAsync("uninstall", wingetId, context);
+        }
+
+        if (plan is not null && InstallRoutes.ChocoIdOf(plan) is { } chocoId && PackageManagers.Chocolatey is not null)
+        {
+            return await ChocolateyAsync("uninstall", chocoId, context);
         }
 
         if (installed?.UninstallCommand is { Length: > 0 } command && SilentSwitchFor(command) is { } silent)

@@ -55,6 +55,13 @@ src/ThixInstall.Cloud    Server (Docker, Port 4955): Razor Pages + MatUi, API /a
    (LRU-Bereinigung bei Überschreiten der eingestellten Größe).
 3. Das Gerät lädt, prüft die SHA-256 und startet den Installer still; ohne Download-URL nimmt es den Paketmanager.
 
+**Beide Wege, jeder der Ausweichweg des anderen** (`InstallPlan.Route`, `InstallRoutes` im Core): der Plan trägt den Download aus dem Cache
+*und* die Paketmanager (Windows: `WingetId` und `ChocoId`, soweit bekannt; macOS: der Cask). Welcher Weg zuerst kommt, legt die Cloud fest
+(Einstellungen › Allgemein: „Cloud-Cache zuerst“ oder „winget/Chocolatey/Homebrew zuerst“; je App unter Windows/macOS überschreibbar).
+Schlägt ein Weg fehl (Cloud nicht erreichbar, Prüfsumme falsch, Fehlercode des Installers), nimmt das Gerät den nächsten und schreibt den
+Wechsel in die Ausgabe des Auftrags. Windows-Reihenfolge der Paketmanager: der der Quelle zuerst (winget bzw. Chocolatey), dann der andere;
+winget fällt weg, wenn das Gerät keins hat. Ältere Clouds senden weder Ids noch Reihenfolge: dann gilt Cache, dann der Paketmanager der Quelle.
+
 **App hinzufügen**: die Cloud durchsucht winget (offizieller Index `source2.msix`, als SQLite in `/data/sources`), den Microsoft Store
 (Store-Dienst von winget), Chocolatey (OData-Feed) und Homebrew (vollständige Listen in `/data/sources`) parallel, schlägt je System einen
 Treffer und eine Kategorie vor und markiert, was schon im Katalog ist. Beim Anlegen kommen Name, Herausgeber, Beschreibung und Homepage aus den

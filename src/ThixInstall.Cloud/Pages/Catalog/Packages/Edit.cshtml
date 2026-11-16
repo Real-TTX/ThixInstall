@@ -32,7 +32,9 @@
                     <ti-field name="StoreId" label="Store-Id" value="@Model.StoreId" mono required maxlength="40" placeholder="9NKSQGP7F2NH" show-if="WindowsMethod" show-value="MicrosoftStore"
                               hint="@(Model.StorePackageFamilyName is null ? "Die Id am Ende der Adresse der App im Microsoft Store (apps.microsoft.com/detail/…)." : $"Erkannt am Paket {Model.StorePackageFamilyName}.")" msg-required="Bitte die Store-Id angeben." />
                     <ti-field name="ChocoId" label="Chocolatey-Id" value="@Model.ChocoId" mono maxlength="200" placeholder="firefox" show-if="WindowsMethod" show-value="Chocolatey,Winget"
-                              hint="Für Chocolatey: der Name bei community.chocolatey.org. Bei winget nur zur Information." />
+                              hint="Der Name bei community.chocolatey.org. Bei winget der Ausweichweg, wenn Cloud-Cache und winget nicht klappen." />
+                    <ti-field name="WindowsRoute" kind="radios" label="Weg auf dem Gerät" value="@Model.WindowsRoute" options="Model.WindowsRoutes" show-if="WindowsMethod" show-value="Winget,Chocolatey"
+                              hint="Was das Gerät zuerst versucht. Klappt es nicht, nimmt es den anderen Weg." />
                     <ti-field name="DirectUrl" kind="url" label="Adresse des Installers" value="@Model.DirectUrl" mono required maxlength="1000" placeholder="https://…/setup.exe" show-if="WindowsMethod" show-value="Direct" msg-required="Bitte die Adresse angeben." />
                     <ti-field name="WindowsFile" kind="file" label="@(Model.WindowsUploadFileName is null ? "Installer" : "Neuer Installer")" optional="@(Model.WindowsUploadFileName is not null)" accept=".msi,.exe,.msix,.msixbundle,.appx,.appxbundle" max-size="2GB" show-if="WindowsMethod" show-value="Upload"
                               hint="@(Model.WindowsUploadFileName is null ? "MSI, EXE oder MSIX bis 2 GB. Die Cloud hält die Datei und liefert sie an die Geräte." : $"Hochgeladen: {Model.WindowsUploadFileName}. Eine neue Datei ersetzt sie.")" />
@@ -56,6 +58,8 @@
                     <ti-field name="MacMethod" kind="radios" label="Quelle" value="@Model.MacMethod" options="EditModel.MacMethods" />
                     <ti-field name="BrewName" label="Name bei Homebrew" value="@Model.BrewName" mono required maxlength="200" placeholder="firefox" show-if="MacMethod" show-value="HomebrewCask,Homebrew"
                               hint="Wie bei „brew install --cask firefox“ bzw. „brew install git“. Zu finden auf formulae.brew.sh." msg-required="Bitte den Namen angeben." />
+                    <ti-field name="MacRoute" kind="radios" label="Weg auf dem Gerät" value="@Model.MacRoute" options="Model.MacRoutes" show-if="MacMethod" show-value="HomebrewCask"
+                              hint="Was das Gerät zuerst versucht. Klappt es nicht (oder fehlt Homebrew), nimmt es den anderen Weg." />
                     <ti-field name="MacDirectUrl" kind="url" label="Adresse des Installers" value="@Model.MacDirectUrl" mono required maxlength="1000" placeholder="https://…/App.dmg" show-if="MacMethod" show-value="Direct"
                               hint="Eine .dmg oder .zip mit der App, oder eine .pkg. Die Cloud lädt sie einmal und hält sie im Cache." msg-required="Bitte die Adresse angeben." />
                     <ti-field name="MacDirectSha256" label="SHA-256" optional value="@Model.MacDirectSha256" mono maxlength="64" show-if="MacMethod" show-value="Direct" hint="Wenn angegeben, prüft die Cloud den Download." />
