@@ -87,7 +87,7 @@ public sealed record InstallPlan
 /// <summary>
 /// How a device recognises an installed app. Windows: an entry of "Installierte Apps" whose DisplayName starts with
 /// <see cref="DisplayName"/> (case-insensitive; a value starting with "^" is a regular expression) or has the MSI
-/// <see cref="ProductCode"/>. macOS: /Applications/<see cref="AppBundleName"/> or the Homebrew formula <see cref="BrewName"/>.
+/// <see cref="ProductCode"/>, or a Store app (MSIX) of the <see cref="PackageFamilyName"/> installed for any user. macOS: /Applications/<see cref="AppBundleName"/> or the Homebrew formula <see cref="BrewName"/>.
 /// </summary>
 public sealed record DetectionRule
 {
@@ -98,6 +98,9 @@ public sealed record DetectionRule
     public string? AppBundleName { get; init; }
 
     public string? BrewName { get; init; }
+
+    /// <summary>Windows: the package family of a Store app ("Microsoft.WindowsTerminal_8wekyb3d8bbwe").</summary>
+    public string? PackageFamilyName { get; init; }
 }
 
 /// <summary>A script ("Makro") of the catalog. It belongs to one OS and runs in one shell.</summary>

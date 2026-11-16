@@ -16,7 +16,8 @@ public enum CpuArchitecture
 /// <summary>
 /// Where a package comes from. The cloud resolves Winget and HomebrewCask packages itself (manifest / cask API) and then
 /// serves the installer from its download cache; the device falls back to the package manager's own command line when
-/// a plan has no <see cref="InstallPlan.DownloadUrl"/>. Chocolatey and Homebrew formulae always run their command line.
+/// a plan has no <see cref="InstallPlan.DownloadUrl"/>. Chocolatey, Homebrew formulae and the Microsoft Store always run their command line
+/// (the device installs Chocolatey first when it is missing); a direct download or an upload always comes from the cache.
 /// </summary>
 public enum InstallMethod
 {
@@ -28,6 +29,13 @@ public enum InstallMethod
     Homebrew = 4,
     /// <summary>A Homebrew cask (apps): the cloud resolves the download; "brew install --cask" is the fallback.</summary>
     HomebrewCask = 5,
+    /// <summary>
+    /// An app of the Microsoft Store: "winget install --id &lt;store id&gt; --source msstore", run by the ThixInstall app as the signed-in user
+    /// (Store apps belong to a user). <see cref="InstallPlan.PackageId"/> is the store id (9WZDNCRFJ3TJ, XP…).
+    /// </summary>
+    MicrosoftStore = 6,
+    /// <summary>An installer an administrator uploaded to the cloud (Windows: MSI, EXE, MSIX; macOS: DMG, PKG, ZIP): always from the cache.</summary>
+    Upload = 7,
 }
 
 /// <summary>What a downloaded installer is, which decides how the device starts it.</summary>
