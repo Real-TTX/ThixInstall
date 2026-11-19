@@ -66,11 +66,13 @@ public sealed record JobRecord
     public string? InstalledVersion { get; init; }
 
     /// <summary>
-    /// A script in the user's context, or an app of the Microsoft Store (Store apps belong to a user; winget refuses the store as
-    /// LocalSystem): run by the app in the user's session, not by the service.
+    /// A script in the user's context, an app of the Microsoft Store (Store apps belong to a user; winget refuses the store as
+    /// LocalSystem) or a Thix app (installed per user, into the profile and HKCU of the user): run by the app in the user's session,
+    /// not by the service.
     /// </summary>
     public bool RunsAsUser => Script is { Context: ScriptContext.User } ||
-                              (Kind is ActionKind.Install or ActionKind.Update or ActionKind.Uninstall && Package?.Install?.Method == InstallMethod.MicrosoftStore);
+                              (Kind is ActionKind.Install or ActionKind.Update or ActionKind.Uninstall &&
+                               Package?.Install?.Method is InstallMethod.MicrosoftStore or InstallMethod.ThixApp);
 
     public bool IsFinished => State is ActionState.Succeeded or ActionState.Failed or ActionState.Cancelled;
 }

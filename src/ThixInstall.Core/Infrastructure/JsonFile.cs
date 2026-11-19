@@ -40,6 +40,8 @@ internal static class JsonFile
         }
     }
 
+    public static T? Deserialize<T>(Stream json) where T : class => JsonSerializer.Deserialize<T>(json, Options);
+
     public static void Write<T>(string path, T value)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);

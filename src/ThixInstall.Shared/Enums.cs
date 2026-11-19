@@ -36,6 +36,13 @@ public enum InstallMethod
     MicrosoftStore = 6,
     /// <summary>An installer an administrator uploaded to the cloud (Windows: MSI, EXE, MSIX; macOS: DMG, PKG, ZIP): always from the cache.</summary>
     Upload = 7,
+    /// <summary>
+    /// A Thix app (ThixFred, ThixClip, ThixNote …): the cloud reads the update manifest of the app (its GitHub channel) and serves the setup
+    /// (Windows) or the zipped bundle (macOS) from its cache. The device runs the setup with the install options of the app
+    /// (<see cref="PackageDto.Installer"/>, <see cref="InstallPlan.Choices"/>; <see cref="ThixAppSetup"/>), on Windows as the signed-in user:
+    /// Thix apps install per user.
+    /// </summary>
+    ThixApp = 8,
 }
 
 /// <summary>

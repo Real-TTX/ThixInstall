@@ -8,7 +8,8 @@ namespace ThixInstall.Cloud.Pages.Catalog.Packages;
 /// <summary>
 /// An app of the catalog with its areas as tabs: Allgemein (name, category, icon, visibility), Windows (winget, Microsoft Store, Chocolatey, a direct
 /// download or an uploaded installer, and how the installed app is recognised), macOS (Homebrew cask or formula, a direct download or an uploaded
-/// installer), Versionen (what the sources resolved to, "Jetzt auflösen"). A new app has the first tab only; saving it opens the others.
+/// installer), Versionen (what the sources resolved to, "Jetzt auflösen"). A Thix app takes the same source on both systems: its GitHub repository and
+/// update manifest; the install options the manifest names are shown on both tabs. A new app has the first tab only; saving it opens the others.
 /// Installers up to 2 GB may be uploaded here (the limit of this page only).
 /// </summary>
 [RequestSizeLimit(PackageUploads.MaxBytes + 4 * 1024 * 1024)]
@@ -23,6 +24,7 @@ public sealed class EditModel : AppPageModel
         new("Chocolatey", "Chocolatey", "Das Gerät ruft choco auf (fehlt Chocolatey, richtet ThixInstall es ein); winget als Ausweichweg"),
         new("Direct", "Direkter Download", "Eine Adresse und die Parameter für die stille Installation"),
         new("Upload", "Eigene Datei", "Ein Installer (MSI, EXE, MSIX), den du hier hochlädst"),
+        new("ThixApp", "Thix-App", "Eine App der Thix-Familie: Setup aus ihrem Release-Kanal auf GitHub, mit ihren Installationsoptionen"),
     ];
 
     public static readonly IReadOnlyList<Choice> MacMethods =
@@ -32,6 +34,7 @@ public sealed class EditModel : AppPageModel
         new("Homebrew", "Homebrew-Formel", "Kommandozeilen-Werkzeuge: das Gerät ruft brew auf"),
         new("Direct", "Direkter Download", "Die Adresse einer dmg, pkg oder zip"),
         new("Upload", "Eigene Datei", "Eine dmg, pkg oder zip, die du hier hochlädst"),
+        new("ThixApp", "Thix-App", "Eine App der Thix-Familie: das Bundle aus ihrem Release-Kanal auf GitHub, mit ihren Installationsoptionen"),
     ];
 
     [BindProperty(SupportsGet = true)]
@@ -66,6 +69,8 @@ public sealed class EditModel : AppPageModel
     [BindProperty] public string MacDirectSha256 { get; set; } = string.Empty;
     [BindProperty] public string MacDirectVersion { get; set; } = string.Empty;
     [BindProperty] public string MacAppBundleName { get; set; } = string.Empty;
+    [BindProperty] public string ThixRepository { get; set; } = string.Empty;
+    [BindProperty] public string ThixManifest { get; set; } = string.Empty;
     [BindProperty] public IFormFile? Icon { get; set; }
     [BindProperty] public IFormFile? WindowsFile { get; set; }
     [BindProperty] public IFormFile? MacFile { get; set; }
@@ -81,6 +86,9 @@ public sealed class EditModel : AppPageModel
     public string? StorePackageFamilyName { get; private set; }
 
     public bool HasIcon { get; private set; }
+
+    /// <summary>A Thix app: what its setup offers, as the last resolve read it from the update manifest.</summary>
+    public InstallerConfig? Installer { get; private set; }
 
     public DateTime? ResolvedDate { get; private set; }
 
@@ -255,6 +263,8 @@ public sealed class EditModel : AppPageModel
         MacDirectSha256 = MacDirectSha256,
         MacDirectVersion = MacDirectVersion,
         MacAppBundleName = MacAppBundleName,
+        ThixRepository = ThixRepository,
+        ThixManifest = ThixManifest,
     };
 
     private static InstallRoute? ParseRoute(string value) => Enum.TryParse<InstallRoute>(value, out var route) && Enum.IsDefined(route) ? route : null;
@@ -304,6 +314,7 @@ public sealed class EditModel : AppPageModel
         WindowsUploadFileName = p.WindowsUploadFileName;
         MacUploadFileName = p.MacUploadFileName;
         StorePackageFamilyName = p.StorePackageFamilyName;
+        Installer = p.Installer;
         if (fill)
         {
             Key = p.Key;
@@ -332,6 +343,8 @@ public sealed class EditModel : AppPageModel
             MacDirectSha256 = p.MacDirectSha256 ?? string.Empty;
             MacDirectVersion = p.MacDirectVersion ?? string.Empty;
             MacAppBundleName = p.MacAppBundleName ?? string.Empty;
+            ThixRepository = p.ThixRepository ?? string.Empty;
+            ThixManifest = p.ThixManifest ?? string.Empty;
         }
         else if (Name.Length == 0)
         {

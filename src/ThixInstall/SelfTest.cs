@@ -75,6 +75,23 @@ internal static class SelfTest
             return Task.FromResult("");
         });
 
+        await Check("install options (installer.json, arguments)", () =>
+        {
+            Ensure(InstallerOptions.Config is { Autostart: not null, DesktopShortcut: not null, AutomaticUpdates: not null }, "installer.json not read");
+            var request = InstallerOptions.Parse([InstallerOptions.QuietArgument, "--autostart=no", "--desktop-shortcut=yes"]);
+            Ensure(request is { Action: SetupAction.Install, Choices: { Autostart: false, DesktopShortcut: true } }, "arguments not read");
+            var config = new InstallerConfig { Autostart = new InstallerSwitch { Default = true }, FileTypes = [new InstallerFileType { Extension = ".md", Name = "Notiz" }] };
+            var back = JsonSerializer.Deserialize<PackageDto>(JsonSerializer.Serialize(new PackageDto
+            {
+                Id = 1, Key = "thixnote", Name = "ThixNote", Category = "Thix-Apps", Installer = config,
+                Install = new InstallPlan { Method = InstallMethod.ThixApp, Choices = new InstallChoices(Autostart: false, FileTypes: [".md"]) },
+            }, ApiContract.Json), ApiContract.Json);
+            Ensure(back?.Installer?.FileTypes is [{ Extension: ".md" }] && back.Install?.Choices?.Autostart == false, "install options of a Thix app not read back");
+            Ensure(string.Join(' ', ThixAppSetup.WindowsArguments(back!.Installer, back.Install!.Choices, isUpdate: false)) == "--quiet --autostart=no --file-types=.md",
+                "arguments of a Thix app wrong");
+            return Task.FromResult("");
+        });
+
         await Check("jobs (JSON)", () =>
         {
             var job = JobService.NewJob(ActionKind.Install, ActionOrigin.Device, title: "Selbsttest");

@@ -49,6 +49,11 @@ public sealed record PackageInput
     public string? MacDirectVersion { get; init; }
     public string? MacUploadFileName { get; init; }
     public string? MacAppBundleName { get; init; }
+    /// <summary>A Thix app: the GitHub repository ("Real-TTX/ThixFred") and the manifest of its channel (empty = "&lt;name&gt;-update.json").</summary>
+    public string? ThixRepository { get; init; }
+    public string? ThixManifest { get; init; }
+    /// <summary>A Thix app: what its setup offers, as the last resolve read it (shown, not posted).</summary>
+    public InstallerConfig? Installer { get; init; }
     public bool HasIcon { get; init; }
     public DateTime? ResolvedDate { get; init; }
 }
@@ -76,7 +81,8 @@ public sealed record ScriptInput
 }
 
 /// <summary>An app or a script on the start page.</summary>
-public sealed record PickerItem(long Id, string Key, string Name, string? Description, string Category, bool HasIcon, bool IsFeatured, string? Version, bool IsScript, string? Note);
+public sealed record PickerItem(long Id, string Key, string Name, string? Description, string Category, bool HasIcon, bool IsFeatured, string? Version, bool IsScript, string? Note,
+    InstallerConfig? Installer = null);
 
 /// <summary>
 /// The catalog: the apps (<see cref="Package"/>) and scripts (<see cref="Script"/>) that devices install and run. Administrators keep it; everybody
@@ -136,6 +142,7 @@ public static class CatalogService
         IsPublic = p.IsPublic,
         LatestVersion = release?.Method == (os == TargetOs.Windows ? p.WindowsMethod : p.MacMethod) ? release?.Version : null,
         Install = ReleaseService.Plan(p, release, os, defaultRoute),
+        Installer = (os == TargetOs.Windows ? p.WindowsMethod : p.MacMethod) == InstallMethod.ThixApp ? ReleaseService.InstallerOf(p) : null,
         Detection = os == TargetOs.Windows
             ? new DetectionRule
             {
@@ -166,6 +173,13 @@ public static class CatalogService
         ContentHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(s.Content))).ToLowerInvariant(),
     };
 
+    /// <summary>For a device before the Thix apps (<see cref="ApiContract.FeaturesHeader"/>): the list without them (it cannot read their method).</summary>
+    public static List<PackageDto> WithoutThixApps(IEnumerable<PackageDto> packages) => packages.Where(p => p.Install?.Method != InstallMethod.ThixApp).ToList();
+
+    /// <summary>For a device before the Thix apps: a Thix app without its plan (the job fails with a message instead of the whole answer).</summary>
+    public static PackageDto? WithoutThixApp(PackageDto? package) =>
+        package?.Install?.Method == InstallMethod.ThixApp ? package with { Install = null, Installer = null } : package;
+
     /// <summary>The start page: the apps and scripts of a system, as tiles. Anonymous: public ones only.</summary>
     public static async Task<(IReadOnlyList<PickerItem> Packages, IReadOnlyList<PickerItem> Scripts)> PickerAsync(AppDbContext db, Actor? actor, TargetOs os, CancellationToken ct = default)
     {
@@ -174,7 +188,8 @@ public static class CatalogService
         var scripts = await db.Scripts.AsNoTracking().Where(s => s.Os == os && (actor != null || s.IsPublic))
             .OrderBy(s => s.Category).ThenBy(s => s.SortOrder).ThenBy(s => s.Name).ToListAsync(ct);
         return (
-            packages.Select(p => new PickerItem(p.Id, p.Key, p.Name, p.Description, p.Category, p.HasIcon, p.IsFeatured, p.LatestVersion, false, p.Publisher)).ToList(),
+            packages.Select(p => new PickerItem(p.Id, p.Key, p.Name, p.Description, p.Category, p.HasIcon, p.IsFeatured, p.LatestVersion, false, p.Publisher,
+                p.Installer is { IsEmpty: false } ? p.Installer : null)).ToList(),
             scripts.Select(s => new PickerItem(s.Id, s.Key, s.Name, s.Description, s.Category, false, false, null, true,
                 s.Context == ScriptContext.User ? "Als Benutzer" : "Mit Administratorrechten")).ToList());
     }
@@ -284,7 +299,8 @@ public static class CatalogService
             DirectUrl = p.DirectUrl, DirectSilentArguments = p.DirectSilentArguments, DirectSha256 = p.DirectSha256, DirectVersion = p.DirectVersion,
             WindowsUploadFileName = p.WindowsUploadFileName, DetectDisplayName = p.DetectDisplayName, MacMethod = p.MacMethod, BrewName = p.BrewName,
             MacDirectUrl = p.MacDirectUrl, MacDirectSha256 = p.MacDirectSha256, MacDirectVersion = p.MacDirectVersion, MacUploadFileName = p.MacUploadFileName,
-            MacAppBundleName = p.MacAppBundleName, HasIcon = hasIcon, ResolvedDate = p.ResolvedDate,
+            MacAppBundleName = p.MacAppBundleName, ThixRepository = p.ThixRepository, ThixManifest = p.ThixManifest, Installer = ReleaseService.InstallerOf(p),
+            HasIcon = hasIcon, ResolvedDate = p.ResolvedDate,
         });
     }
 
@@ -413,6 +429,13 @@ public static class CatalogService
                 }
 
                 break;
+            case InstallMethod.ThixApp:
+                if (CheckThixApp(input) is { } thixError)
+                {
+                    return thixError;
+                }
+
+                break;
             case InstallMethod.Direct:
                 if (!Text.IsHttpUrl(input.DirectUrl))
                 {
@@ -447,6 +470,7 @@ public static class CatalogService
         package.DirectSha256 = Text.Clean(input.DirectSha256, 64)?.ToLowerInvariant();
         package.DirectVersion = Text.Clean(input.DirectVersion, 60);
         package.DetectDisplayName = Text.Clean(input.DetectDisplayName, 200);
+        SetThixApp(package, input, input.WindowsMethod);
         if (stored is not null)
         {
             package.WindowsUploadSha256 = stored.Sha256;
@@ -490,6 +514,13 @@ public static class CatalogService
         switch (input.MacMethod)
         {
             case null:
+                break;
+            case InstallMethod.ThixApp:
+                if (CheckThixApp(input) is { } thixError)
+                {
+                    return thixError;
+                }
+
                 break;
             case InstallMethod.Homebrew or InstallMethod.HomebrewCask:
                 if (!BrewResolver.IsValidName(Text.Clean(input.BrewName, 200)))
@@ -557,6 +588,7 @@ public static class CatalogService
         package.MacDirectSha256 = Text.Clean(input.MacDirectSha256, 64)?.ToLowerInvariant();
         package.MacDirectVersion = Text.Clean(input.MacDirectVersion, 60);
         package.MacAppBundleName = appName;
+        SetThixApp(package, input, input.MacMethod);
         if (stored is not null)
         {
             package.MacUploadSha256 = stored.Sha256;
@@ -575,6 +607,29 @@ public static class CatalogService
         }
 
         return await ResolveAfterSaveAsync(db, package.Id, ct);
+    }
+
+    /// <summary>A Thix app needs the repository on GitHub; the manifest is optional ("&lt;name&gt;-update.json").</summary>
+    private static Outcome<string>? CheckThixApp(PackageInput input)
+    {
+        if (!ThixAppResolver.IsValidRepository(Text.Clean(input.ThixRepository, 200)))
+        {
+            return Outcome<string>.Fail("Bitte das GitHub-Repository der App angeben, z. B. Real-TTX/ThixFred.", "ThixRepository");
+        }
+
+        return Text.Clean(input.ThixManifest, 200) is { } manifest && !ThixAppResolver.IsValidManifest(manifest)
+            ? Outcome<string>.Fail("Das Update-Manifest ist ein Dateiname auf .json, z. B. thixfred-update.json.", "ThixManifest")
+            : null;
+    }
+
+    /// <summary>The source of a Thix app is the same for both systems: saved by the tab that chose it.</summary>
+    private static void SetThixApp(Package package, PackageInput input, InstallMethod? method)
+    {
+        if (method == InstallMethod.ThixApp)
+        {
+            package.ThixRepository = Text.Clean(input.ThixRepository, 200);
+            package.ThixManifest = Text.Clean(input.ThixManifest, 200);
+        }
     }
 
     private static async Task<Outcome<string>> ResolveAfterSaveAsync(AppDbContext db, long packageId, CancellationToken ct)

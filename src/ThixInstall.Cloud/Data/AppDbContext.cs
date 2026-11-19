@@ -114,6 +114,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, IHttpCo
             e.Property(x => x.MacUploadSha256).HasMaxLength(64);
             e.Property(x => x.MacUploadFileName).HasMaxLength(260);
             e.Property(x => x.MacAppBundleName).HasMaxLength(200);
+            e.Property(x => x.ThixRepository).HasMaxLength(200);
+            e.Property(x => x.ThixManifest).HasMaxLength(200);
+            e.Property(x => x.InstallerOptions).HasMaxLength(8000);
             e.HasIndex(x => x.Key).IsUnique().HasFilter("\"UpdateState\" <> 0");
             e.HasQueryFilter(x => x.UpdateState != SoftEntity.Deleted);
         });
@@ -237,6 +240,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, IHttpCo
         b.Entity<BundleItem>(e =>
         {
             e.ToTable("BundleItem");
+            e.Property(x => x.InstallChoices).HasMaxLength(2000);
             e.HasIndex(x => x.BundleId);
             e.HasOne<Bundle>().WithMany().HasForeignKey(x => x.BundleId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Package).WithMany().HasForeignKey(x => x.PackageId).OnDelete(DeleteBehavior.Cascade);

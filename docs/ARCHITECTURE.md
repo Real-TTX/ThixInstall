@@ -22,7 +22,7 @@ src/ThixInstall.Cloud    Server (Docker, Port 4955): Razor Pages + MatUi, API /a
 
 | Begriff | Bedeutung |
 |---|---|
-| **Paket (Package)** | Eine App im Katalog. Quellen je Betriebssystem: Windows `winget`-Id, Microsoft-Store-Id, `choco`-Id, direkter Download oder eine hochgeladene Datei; macOS Homebrew-Cask oder -Formel, direkter Download oder eine hochgeladene Datei. „App hinzufügen“ sucht in allen Quellen und legt die App mit einem Klick an. |
+| **Paket (Package)** | Eine App im Katalog. Quellen je Betriebssystem: Windows `winget`-Id, Microsoft-Store-Id, `choco`-Id, direkter Download, eine hochgeladene Datei oder eine **Thix-App**; macOS Homebrew-Cask oder -Formel, direkter Download, eine hochgeladene Datei oder eine Thix-App. „App hinzufügen“ sucht in allen Quellen und legt die App mit einem Klick an. |
 | **Skript (Script)** | Ein „Makro“: PowerShell/Cmd (Windows) oder Bash/Zsh (macOS), Kontext *System* (Administratorrechte) oder *Benutzer*. |
 | **Bundle** | Die Auswahl von der Startseite (Token = Geheimnis). Download = **eine** ThixInstall-EXE, in der die ganze Konfiguration steckt (`BundleTicket`: Cloud, Token, Apps mit Installationsplänen, Skripte, Agent, Profil). |
 | **Gerät (Device)** | Ein Rechner mit installiertem ThixInstall, angemeldet an einem Konto (Token). |
@@ -47,6 +47,10 @@ src/ThixInstall.Cloud    Server (Docker, Port 4955): Razor Pages + MatUi, API /a
    - **Microsoft Store**: Version (oft keine: die App aktualisiert sich selbst) und Paketfamilie aus dem Store-Manifest; das Gerät ruft
      `winget install --id <Store-Id> --source msstore` als angemeldeter Benutzer auf (Store-Apps gehören einem Benutzer).
    - **Direkt**: URL + stille Parameter aus dem Katalog, SHA-256 optional; macOS dmg/zip (mit dem Namen der App) oder pkg.
+   - **Thix-App** (ThixFred, ThixClip, ThixNote …): das Update-Manifest des Release-Kanals der App auf GitHub
+     (`<repo>/releases/download/release-channel/<app>-update.json`): Version, Setup (Windows, auch für Arm) bzw. gezipptes Bundle je
+     Prozessor (macOS) mit SHA-256, über den Cache. Dazu der Block `installer` (MatDesign SETUP-08): was das Setup anbietet –
+     Desktop-Verknüpfung, Autostart, automatische Updates, Dateitypen, je mit Vorgabe; die Cloud speichert ihn bei der App.
    - **Eigene Datei**: ein Administrator lädt den Installer hoch (Windows msi/exe/msix, macOS dmg/pkg/zip, bis 2 GB); er liegt in
      `/data/uploads` (nie von der Cache-Bereinigung entfernt) und wird wie ein Cache-Eintrag ausgeliefert. Version und Parameter gibt der
      Administrator an.
@@ -67,6 +71,15 @@ winget fällt weg, wenn das Gerät keins hat. Ältere Clouds senden weder Ids no
 Treffer und eine Kategorie vor und markiert, was schon im Katalog ist. Beim Anlegen kommen Name, Herausgeber, Beschreibung und Homepage aus den
 Quellen (winget: Locale-Manifest), das Icon von Chocolatey oder der Homepage; danach wird aufgelöst.
 
+**Installationsoptionen der Thix-Apps** (SETUP-08): kreuzt jemand auf der Startseite eine Thix-App an, erscheinen ihre Fragen mit den Vorgaben;
+die Antworten speichert das Paket (`BundleItem.InstallChoices`, nur was die App anbietet) und gibt sie im Plan mit (`InstallPlan.Choices`). Das
+Gerät baut daraus die Kommandozeile (`ThixAppSetup` im Vertrag): Windows `<App>Setup.exe --quiet --desktop-shortcut=yes|no --autostart=yes|no
+--automatic-updates=yes|no --file-types=.a,.b|none` (nur angebotene Optionen) und `--start`, wenn Autostart gewählt ist; ein Update ruft `--update`
+(die App behält ihre Wahl), eine App ohne `installer`-Block ebenfalls `--update`. macOS kopiert das Bundle nach /Programme und ruft
+`<App>.app/Contents/MacOS/<App> --configure <Optionen>`. Exit-Code 2 = die App hat die Optionen abgelehnt und nichts geändert (der Auftrag schlägt
+mit ihrer Meldung fehl). Ohne Auswahl (Katalog auf dem Gerät, Aufträge, Profile) gelten die Vorgaben der App. Thix-Apps installieren pro Benutzer:
+unter Windows führt sie – wie Store-Apps – die App in der Sitzung des Benutzers aus, nicht der Dienst.
+
 Erkennung installierter Apps: Windows über „Installierte Apps“ (Registry Uninstall, HKLM 64/32 Bit und die Benutzer) bzw. bei Store-Apps (MSIX)
 über die Paketfamilie,
 macOS über `/Applications/<App>.app` (`CFBundleShortVersionString`) bzw. `brew list --versions`. Update verfügbar =
@@ -77,7 +90,7 @@ macOS über `/Applications/<App>.app` (`CFBundleShortVersionString`) bzw. `brew 
 | Art | Wann | Was |
 |---|---|---|
 | **Bundle-Runner** | Programm trägt ein `BundleTicket` mit der Paket-Konfiguration (an die EXE angehängt; macOS: `.thixinstall`-Datei neben der signierten App) und ist nicht installiert | Ninite-artiges Fenster: liest die eingepackte Konfiguration, installiert alles nacheinander mit Fortschritt; Windows startet sich dafür einmal mit Administratorrechten neu. Bundle mit Agent: installiert danach ThixInstall und meldet das Gerät mit dem Bundle-Token an. |
-| **Setup** (Windows) | `ThixInstallSetup.exe` ohne Ticket, nicht installiert | Assistent: nach `%ProgramFiles%\ThixInstall`, Dienst „ThixInstall Agent“ (LocalSystem), Startmenü, Autostart, Updates. Still: `--install --quiet [--cloud <url> --enroll-key <schlüssel>]`. |
+| **Setup** (Windows) | `ThixInstallSetup.exe` ohne Ticket, nicht installiert | Assistent: nach `%ProgramFiles%\ThixInstall`, Dienst „ThixInstall Agent“ (LocalSystem), Startmenü; Desktop-Verknüpfung, Autostart und automatische Updates nach `installer.json` (SETUP-08). Still: `--quiet [--desktop-shortcut=yes/no --autostart=yes/no --automatic-updates=yes/no] [--start] [--cloud <url> --enroll-key <schlüssel>]` (auch `--install`), `--update`, `--configure`; eine falsche Option endet mit Exit-Code 2, ohne etwas zu tun. |
 | **Dienst** (Windows) | `ThixInstall.exe --service` (vom Dienst-Manager) | Der Agent: Verbindung zur Cloud, Inventar, Aufträge, Auto-Updates – als LocalSystem, ohne UAC. |
 | **App** | sonst | Tray + Hauptfenster: Katalog, Updates, Skripte, Aufträge, Einstellungen. Spricht mit dem Agenten über `AgentClient`: Windows installiert → Named Pipe zum Dienst; macOS und Entwicklung → derselbe Agent im eigenen Prozess. |
 
@@ -95,7 +108,7 @@ Geheimnis ist.
 |---|---|
 | `User` | Name, Anzeigename, E-Mail, Passwort-Hash, `IsAdmin` |
 | `UserSession` | Token, UserId, Ablauf (Browser-Anmeldung) |
-| `Package` | Key, Name, Publisher, Beschreibung, Kategorie, Homepage, Icon (bytea + Typ), `IsPublic`, `IsFeatured`, Sortierung; Windows: `WindowsMethod`, `WingetId`, `StoreId`, `StorePackageFamilyName`, `ChocoId`, `DirectUrl`, `DirectSilentArguments`, `DirectSha256`, `DirectVersion`, `WindowsUploadSha256`, `WindowsUploadFileName`, `DetectDisplayName`; macOS: `MacMethod`, `BrewName`, `MacDirectUrl`, `MacDirectSha256`, `MacDirectVersion`, `MacUploadSha256`, `MacUploadFileName`, `MacAppBundleName` |
+| `Package` | Key, Name, Publisher, Beschreibung, Kategorie, Homepage, Icon (bytea + Typ), `IsPublic`, `IsFeatured`, Sortierung; Thix-App: `ThixRepository`, `ThixManifest`, `InstallerOptions` (JSON des `installer`-Blocks); Windows: `WindowsMethod`, `WingetId`, `StoreId`, `StorePackageFamilyName`, `ChocoId`, `DirectUrl`, `DirectSilentArguments`, `DirectSha256`, `DirectVersion`, `WindowsUploadSha256`, `WindowsUploadFileName`, `DetectDisplayName`; macOS: `MacMethod`, `BrewName`, `MacDirectUrl`, `MacDirectSha256`, `MacDirectVersion`, `MacUploadSha256`, `MacUploadFileName`, `MacAppBundleName` |
 | `PackageRelease` | PackageId, Os, Architecture, Version, Method, InstallerUrl, Sha256, InstallerKind, SilentArguments, ProductCode, AppBundleName, FileName, Size, ResolvedDate, Error |
 | `Script` | Key, Name, Beschreibung, Kategorie, Os, Shell, Context, Content, TimeoutSeconds, `IsPublic` |
 | `Profile` | Name, Beschreibung, Os (optional), `EnrollmentKey` (Token) |
@@ -104,7 +117,7 @@ Geheimnis ist.
 | `DeviceApp` | DeviceId, Name, Version, Publisher, PackageId, Source (das letzte Inventar) |
 | `DeviceAction` | DeviceId, Kind, State, Origin, PackageId, ScriptId, Title, RequestedByUserId, Revision, StartedDate, FinishedDate, ExitCode, Output, InstalledVersion |
 | `Bundle` | Token, Name, Os, `IncludesAgent`, ProfileId, OwnerUserId (null = anonym), DownloadCount, LastDownloadDate |
-| `BundleItem` | BundleId, PackageId oder ScriptId, Sortierung |
+| `BundleItem` | BundleId, PackageId oder ScriptId, Sortierung, `InstallChoices` (JSON: die Installationsoptionen einer Thix-App) |
 | `CacheFile` | Sha256, SourceUrl, FileName, ContentType, Size, LastUsedDate, UseCount |
 | `Setting` | Key/Value: Desktop-Kanal, GitHub-Token, Cache-Größe, öffentlicher Katalog an/aus |
 

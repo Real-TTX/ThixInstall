@@ -70,6 +70,7 @@ public sealed class AppTileViewModel : ObservableObject
         InstallMethod.Homebrew => "Homebrew",
         InstallMethod.MicrosoftStore => "Microsoft Store",
         InstallMethod.Upload => "Eigene Datei · Cloud-Cache",
+        InstallMethod.ThixApp => "Thix-App · Cloud-Cache",
         _ => "",
     };
 

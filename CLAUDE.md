@@ -10,7 +10,7 @@ everything silently. With an account the bundle can also install **ThixInstall i
 account, shows updates, installs from the catalog and - with **Sync** on - runs the actions sent from the cloud (a simple
 Intune/Entra). **Profiles** bundle apps and scripts for devices and allow auto-enrollment with a key. Underneath it uses
 **winget / Chocolatey / Homebrew**; the cloud resolves the installers (winget manifests, Homebrew cask API) and **caches the
-downloads** - devices take the cache or the package manager first (a setting, per app overridable), the other one is the fallback; further sources are the **Microsoft Store**, direct downloads and **installers uploaded** to the cloud, and "App hinzufügen"
+downloads** - devices take the cache or the package manager first (a setting, per app overridable), the other one is the fallback; further sources are the **Microsoft Store**, direct downloads, **installers uploaded** to the cloud and the **Thix apps** (their update manifest on GitHub; the start page asks the install options of SETUP-08 and the device passes them to the quiet setup), and "App hinzufügen"
 searches all sources at once (`src/ThixInstall.Cloud/Business/Sources`). The design (data model, modes, installing) is [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the server is
 [docs/CLOUD.md](docs/CLOUD.md). UI language German; code, comments and identifiers English.
 
@@ -44,21 +44,34 @@ Stack: **.NET 10**, C#. Desktop: **Avalonia 11.3** (Fluent underneath our own lo
 ## Map
 
 ```
-src/ThixInstall.Shared   the contract: ApiContract (routes, limits, JSON), DTOs (catalog, plans, bundles, devices, actions),
-                         BundleTicket (the trailer of a bundle program / .thixinstall file), AppVersion (version compare)
+src/ThixInstall.Shared   the contract: ApiContract (routes, limits, JSON; the header X-ThixInstall-Features: "thix-apps" – without it
+                         the cloud leaves Thix apps out, an older ThixInstall cannot read InstallMethod.ThixApp), DTOs (catalog, plans, bundles, devices, actions),
+                         BundleTicket (the trailer of a bundle program / .thixinstall file), AppVersion (version compare),
+                         InstallerOptions.cs (SETUP-08 of MatDesign, one contract for every Thix app: InstallerConfig = installer.json
+                         / the "installer" block of an update manifest, InstallChoices, ThixAppSetup = THE command line ThixInstall
+                         passes to a Thix app: Windows "--quiet <options> [--start]" or "--update", macOS "--configure <options>")
 src/ThixInstall.Core     (no UI)
   Models/                AppSettings (per user: look, window), AgentSettings (+ CloudConnection), JobRecord, AgentStatus,
-                         CatalogApp/Snapshot, JobRequest, ConnectRequest, AgentSettingsChange, AgentCaller, BusinessException
+                         CatalogApp/Snapshot, JobRequest, ConnectRequest, AgentSettingsChange, AgentCaller, BusinessException,
+                         SetupAction/SetupRequest (the setup part of a command line)
   Business/              static classes: AgentHost (the agent: start/stop, timers, every request of the app with its permission
                          checks), JobService (queue, one job at a time, history jobs.json, user-context scripts and Store apps for the app: RunClaimedAsync),
                          CloudService (enroll/leave, the loop: facts, catalog, inventory, actions long poll), CatalogService
                          (catalog.json, snapshot with installed state), InventoryService (installed apps, matching to the
                          catalog), BundleService (ticket, plan, run, install + enroll ThixInstall), InstallService (Windows:
                          Program Files, service "ThixInstall Agent", HKLM uninstall entry), UpdateService (OTA from GitHub),
-                         AutostartService (HKLM/HKCU Run, LaunchAgent), AccessPolicy (policies), MacAppBundle, SettingsService
+                         AutostartService (HKLM/HKCU Run, LaunchAgent), AccessPolicy (policies), MacAppBundle, SettingsService,
+                         InstallerOptions (ThixInstall's own setup, SETUP-08: installer.json – embedded, and as "installer" in the
+                         update manifest – offers desktop shortcut, autostart, automatic updates, no file types; Parse of
+                         --quiet|--install / --update / --configure / --uninstall with --desktop-shortcut=yes|no --autostart=yes|no
+                         --automatic-updates=yes|no --file-types=none|default [--start] and the older --no-autostart/--desktop/
+                         --no-auto-update; a wrong value = exit code 2, nothing done; Current/Apply)
   Installers/            InstallRoutes (cache and package managers in the order of the plan, each the fallback of the other),
                          WindowsInstaller (cached download → MSI/EXE/MSIX, winget/choco (installs Chocolatey when missing)/msstore; silent uninstall), MacInstaller
-                         (DMG/ZIP → /Applications, PKG via installer, else brew), ScriptRunner, Downloads, JobContext/JobOutcome
+                         (DMG/ZIP → /Applications, PKG via installer, else brew), ScriptRunner, Downloads, JobContext/JobOutcome,
+                         ThixAppInstall (a Thix app: Windows runs its setup with ThixAppSetup's arguments, macOS copies the bundle and
+                         runs <App>.app/Contents/MacOS/<App> --configure; exit code 2 = options refused; on Windows these jobs run as
+                         the user like Store apps – Thix apps install per user)
   Agent/                 AgentClient (the app's way to the agent: in-process or named pipe "ThixInstall.Agent"), AgentProtocol,
                          AgentPipeServer (the service side; the caller's name and elevation), AgentWindowsService (--service)
   Infrastructure/        CloudClient (HTTP of the contract, downloads with SHA-256), JsonFile, SettingsStore, TokenStore
@@ -67,8 +80,9 @@ src/ThixInstall.Core     (no UI)
                          Store packages by family (AppxAllUserStore), /Applications, brew), PackageManagers (winget also for LocalSystem, choco, brew), MachineInfo
                          (hardware id, OS version), WindowActivation, Windows/ShellLink (generated COM), Windows/MachineFolder (ACL)
 src/ThixInstall          (Avalonia app)
-  Program / App          start modes: --service, --agent-console, --self-test, Windows setup commands (--install/--update/
-                         --uninstall, elevated), bundle (ticket → BundleWindow; Windows elevated once), setup assistant, the app
+  Program / App          start modes: --service, --agent-console, --self-test, the setup commands of SETUP-05/08 (Windows
+                         --quiet|--install / --update / --configure / --uninstall, elevated; a refused option ends with exit code 2;
+                         macOS --configure), bundle (ticket → BundleWindow; Windows elevated once), setup assistant, the app
   AgentMonitor           polls the agent status (1.5 s visible / 10 s hidden), raises Status/Jobs/Catalog changes, runs user
                          scripts for the service, restarts the app when the service was updated
   MainWindow             header (search of the page, refresh, caption buttons), sidebar (Katalog, Updates, Skripte, Aufträge
@@ -77,7 +91,8 @@ src/ThixInstall          (Avalonia app)
                          UpdatesPage, ScriptsPage, JobsPage (list + detail with output, cancel, retry), SettingsPage (tabs
                          Allgemein | Cloud | Updates | Erweitert), AboutPage
   Bundle/                BundleWindow (the Ninite-like runner)
-  Setup/                 SetupWindow (Windows install / update / uninstall assistant; runs the work elevated, tails its log)
+  Setup/                 SetupWindow (Windows install / update / uninstall assistant; the questions and defaults from installer.json;
+                         runs the work elevated with the options of SETUP-08, tails its log)
   Controls/              ONE code base per control: AppIcon (picture or coloured letter), StatusChip, Toolbar, ActionBar,
                          FormField, SettingRow, InfoBar, IconView, IconLabel
   ViewModels/            AppTileViewModel, ScriptRowViewModel, JobRowViewModel (ObservableObject)

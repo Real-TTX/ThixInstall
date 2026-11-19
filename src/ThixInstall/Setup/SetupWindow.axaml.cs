@@ -85,9 +85,14 @@ public partial class SetupWindow : ThemedWindow
         }
         else
         {
-            AutostartToggle.IsChecked = true;
-            DesktopToggle.IsChecked = InstallService.HasDesktopShortcut;
-            AutoUpdateToggle.IsChecked = true;
+            // the questions and their defaults from installer.json (SETUP-08): what ThixLauncher asks before a quiet install
+            var config = InstallerOptions.Config;
+            AutostartRow.IsVisible = config.Autostart is not null;
+            AutostartToggle.IsChecked = config.Autostart?.Default == true;
+            DesktopRow.IsVisible = config.DesktopShortcut is not null;
+            DesktopToggle.IsChecked = InstallService.HasDesktopShortcut || config.DesktopShortcut?.Default == true;
+            AutoUpdateRow.IsVisible = config.AutomaticUpdates is not null;
+            AutoUpdateToggle.IsChecked = config.AutomaticUpdates?.Default == true;
             PrimaryLabel.Text = "Installieren";
         }
 
@@ -149,16 +154,11 @@ public partial class SetupWindow : ThemedWindow
         else
         {
             arguments.AddRange([InstallService.InstallArgument, InstallService.QuietArgument]);
-            arguments.Add(AutostartToggle.IsChecked == true ? "--autostart" : "--no-autostart");
-            if (DesktopToggle.IsChecked == true)
-            {
-                arguments.Add("--desktop");
-            }
-
-            if (AutoUpdateToggle.IsChecked != true)
-            {
-                arguments.Add("--no-auto-update");
-            }
+            var config = InstallerOptions.Config;
+            arguments.AddRange(InstallerOptions.ToArguments(new Shared.InstallChoices(
+                config.DesktopShortcut is null ? null : DesktopToggle.IsChecked == true,
+                config.Autostart is null ? null : AutostartToggle.IsChecked == true,
+                config.AutomaticUpdates is null ? null : AutoUpdateToggle.IsChecked == true)));
 
             if (!string.IsNullOrWhiteSpace(CloudBox.Text))
             {
@@ -193,7 +193,7 @@ public partial class SetupWindow : ThemedWindow
             {
                 null => "Ohne Administratorrechte kann ThixInstall nicht für diesen Computer eingerichtet werden.",
                 0 => null,
-                2 => null,
+                3 => null, // installed; the connection to the cloud failed (the finish page says so)
                 _ => _steps.LastOrDefault(step => step.StartsWith("Fehler", StringComparison.Ordinal)) ?? $"Das Setup endete mit Code {exitCode}.",
             };
         }

@@ -158,6 +158,18 @@ public sealed class Package : SoftEntity
     /// <summary>"Firefox.app"; empty = what the cask names.</summary>
     public string? MacAppBundleName { get; set; }
 
+    /// <summary>A Thix app (<see cref="InstallMethod.ThixApp"/>): the GitHub repository that publishes it ("Real-TTX/ThixFred").</summary>
+    public string? ThixRepository { get; set; }
+
+    /// <summary>A Thix app: the update manifest of its channel ("thixfred-update.json"); empty = "&lt;name&gt;-update.json".</summary>
+    public string? ThixManifest { get; set; }
+
+    /// <summary>
+    /// A Thix app: what its setup offers (the block "installer" of the update manifest, SETUP-08), as JSON (<see cref="InstallerConfig"/>);
+    /// refreshed with every resolve, null when the manifest has none.
+    /// </summary>
+    public string? InstallerOptions { get; set; }
+
     /// <summary>When the sources were resolved the last time (null = never).</summary>
     public DateTime? ResolvedDate { get; set; }
 
@@ -406,6 +418,9 @@ public sealed class BundleItem : Entity
     public Script? Script { get; set; }
 
     public int SortOrder { get; set; }
+
+    /// <summary>A Thix app: the install options picked on the start page, as JSON (<see cref="InstallChoices"/>); null = the defaults.</summary>
+    public string? InstallChoices { get; set; }
 }
 
 /// <summary>A file of the download cache (<c>/data/cache/&lt;Sha256&gt;</c>), fetched once from <see cref="SourceUrl"/>.</summary>

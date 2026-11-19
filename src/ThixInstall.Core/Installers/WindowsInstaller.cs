@@ -41,7 +41,7 @@ internal static partial class WindowsInstaller
         var verb = isUpdate ? "upgrade" : "install";
         return await InstallRoutes.RunAsync(routes, route => route switch
         {
-            InstallRouteStep.Cache => InstallDownloadAsync(package, plan, context),
+            InstallRouteStep.Cache => InstallDownloadAsync(package, plan, isUpdate, context),
             InstallRouteStep.Winget => WingetAsync(verb, InstallRoutes.WingetIdOf(plan), context),
             _ => ChocolateyAsync(verb, InstallRoutes.ChocoIdOf(plan), context),
         }, context);
@@ -97,14 +97,16 @@ internal static partial class WindowsInstaller
             : $"Für {package.Name} ist keine stille Deinstallation bekannt – bitte unter „Installierte Apps“ entfernen.");
     }
 
-    private static async Task<JobOutcome> InstallDownloadAsync(PackageDto package, InstallPlan plan, JobContext context)
+    private static async Task<JobOutcome> InstallDownloadAsync(PackageDto package, InstallPlan plan, bool isUpdate, JobContext context)
     {
         string? file = null;
         try
         {
             file = await Downloads.FetchAsync(plan, context);
             context.Report($"Installiere {package.Name} …");
-            var arguments = plan.SilentArguments ?? "";
+            // a Thix app: its setup with the install options (SETUP-08), the same command line for every Thix app
+            var isThixApp = plan.Method == InstallMethod.ThixApp;
+            var arguments = isThixApp ? string.Join(' ', ThixAppSetup.WindowsArguments(package.Installer, plan.Choices, isUpdate)) : plan.SilentArguments ?? "";
             ProcessResult result;
             switch (plan.InstallerKind)
             {
@@ -125,6 +127,11 @@ internal static partial class WindowsInstaller
                     context.Step($"{Path.GetFileName(file)} {arguments}".TrimEnd());
                     result = await ProcessRunner.RunAsync(file, null, InstallTimeout, context.Cancellation, workingDirectory: Path.GetDirectoryName(file), rawArguments: arguments);
                     break;
+            }
+
+            if (isThixApp && result.ExitCode == ThixAppSetup.RefusedExitCode)
+            {
+                return JobOutcome.Fail(context, ThixAppInstall.RefusedMessage(package, result.Output), result.Output, result.ExitCode);
             }
 
             return Outcome(result, context, SuccessCodes);

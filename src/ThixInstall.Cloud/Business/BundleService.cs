@@ -5,8 +5,12 @@ using ThixInstall.Shared;
 
 namespace ThixInstall.Cloud.Business;
 
-/// <summary>What the start page posts.</summary>
-public sealed record BundleRequest(TargetOs Os, IReadOnlyList<long> PackageIds, IReadOnlyList<long> ScriptIds, string? Name, bool IncludesAgent, long? ProfileId);
+/// <summary>
+/// What the start page posts. <see cref="Choices"/>: the install options picked for Thix apps, by package id (SETUP-08; an app without options
+/// ignores them, what is not given takes the default of the app).
+/// </summary>
+public sealed record BundleRequest(TargetOs Os, IReadOnlyList<long> PackageIds, IReadOnlyList<long> ScriptIds, string? Name, bool IncludesAgent, long? ProfileId,
+    IReadOnlyDictionary<long, InstallChoices>? Choices = null);
 
 /// <summary>A bundle as its page shows it.</summary>
 public sealed record BundleView(long Id, string Token, string Name, TargetOs Os, bool IncludesAgent, string? ProfileName, string? OwnerName, long? OwnerUserId,
@@ -92,7 +96,7 @@ public static class BundleService
         var order = 0;
         foreach (var id in packageIds)
         {
-            db.BundleItems.Add(new BundleItem { BundleId = bundle.Id, PackageId = id, SortOrder = order++ });
+            db.BundleItems.Add(new BundleItem { BundleId = bundle.Id, PackageId = id, SortOrder = order++, InstallChoices = ChoicesJson(packages.First(p => p.Id == id), request.Choices) });
         }
 
         foreach (var id in scriptIds)
@@ -132,9 +136,79 @@ public static class BundleService
             bundle.IncludesAgent,
             CanEnroll(bundle),
             bundle.Profile?.Name,
-            packageIds.Select(id => packages.FirstOrDefault(p => p.Id == id)).OfType<PackageDto>().ToList(),
+            packageIds.Select(id => packages.FirstOrDefault(p => p.Id == id)).OfType<PackageDto>().Select(p => WithChoices(p, items.First(i => i.PackageId == p.Id))).ToList(),
             scriptIds.Select(id => scripts.FirstOrDefault(s => s.Id == id)).OfType<Script>().Select(CatalogService.ToDto).ToList(),
             new DateTimeOffset(DateTime.SpecifyKind(bundle.CreateDate, DateTimeKind.Utc)));
+    }
+
+    /// <summary>
+    /// The install options of a Thix app in a bundle, as stored: only what the app offers, the default where nothing was picked (<see cref="ThixAppSetup.Effective"/>).
+    /// Null for every other app.
+    /// </summary>
+    public static string? ChoicesJson(PackageDto package, IReadOnlyDictionary<long, InstallChoices>? choices)
+    {
+        if (package.Installer is not { IsEmpty: false } config || choices?.GetValueOrDefault(package.Id) is not { } picked)
+        {
+            return null;
+        }
+
+        return System.Text.Json.JsonSerializer.Serialize(ThixAppSetup.Effective(config, picked), ApiContract.Json);
+    }
+
+    /// <summary>The plan of a Thix app carries the options picked for it (the device passes them to the setup).</summary>
+    private static PackageDto WithChoices(PackageDto package, BundleItem item)
+    {
+        var choices = ParseChoices(item.InstallChoices);
+        return choices is null || package.Install is null || package.Installer is null ? package : package with { Install = package.Install with { Choices = choices } };
+    }
+
+    public static InstallChoices? ParseChoices(string? json)
+    {
+        if (string.IsNullOrEmpty(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<InstallChoices>(json, ApiContract.Json);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The picked options in words for the page of a bundle: "Desktop-Verknüpfung · Autostart · ohne automatische Updates".</summary>
+    public static string? Describe(InstallChoices? choices)
+    {
+        if (choices is null)
+        {
+            return null;
+        }
+
+        var parts = new List<string>();
+        if (choices.DesktopShortcut is { } shortcut)
+        {
+            parts.Add(shortcut ? "Desktop-Verknüpfung" : "ohne Desktop-Verknüpfung");
+        }
+
+        if (choices.Autostart is { } autostart)
+        {
+            parts.Add(autostart ? "Autostart" : "ohne Autostart");
+        }
+
+        if (choices.AutomaticUpdates is { } updates)
+        {
+            parts.Add(updates ? "automatische Updates" : "ohne automatische Updates");
+        }
+
+        if (choices.FileTypes is { } types)
+        {
+            parts.Add(types.Count == 0 ? "keine Dateitypen" : "öffnet " + string.Join(", ", types));
+        }
+
+        return parts.Count == 0 ? null : string.Join(" · ", parts);
     }
 
     /// <summary>A bundle that installs ThixInstall enrolls devices for its owner while it is young enough.</summary>
@@ -166,7 +240,7 @@ public static class BundleService
         var items = await db.BundleItems.AsNoTracking().Where(i => i.BundleId == bundle.Id).OrderBy(i => i.SortOrder)
             .Select(i => new
             {
-                i.PackageId, i.ScriptId,
+                i.PackageId, i.ScriptId, i.InstallChoices,
                 PackageName = i.Package != null ? i.Package.Name : null, PackageKey = i.Package != null ? i.Package.Key : null,
                 PackageCategory = i.Package != null ? i.Package.Category : null, PackageDescription = i.Package != null ? i.Package.Description : null,
                 HasIcon = i.PackageId != null && db.PackageIcons.Any(x => x.PackageId == i.PackageId),
@@ -175,7 +249,8 @@ public static class BundleService
             })
             .ToListAsync(ct);
         var packages = items.Where(i => i.PackageId != null && i.PackageName != null)
-            .Select(i => new PickerItem(i.PackageId!.Value, i.PackageKey!, i.PackageName!, i.PackageDescription, i.PackageCategory!, i.HasIcon, false, null, false, null)).ToList();
+            .Select(i => new PickerItem(i.PackageId!.Value, i.PackageKey!, i.PackageName!, i.PackageDescription, i.PackageCategory!, i.HasIcon, false, null, false,
+                Describe(ParseChoices(i.InstallChoices)))).ToList();
         var scripts = items.Where(i => i.ScriptId != null && i.ScriptName != null)
             .Select(i => new PickerItem(i.ScriptId!.Value, i.ScriptKey!, i.ScriptName!, i.ScriptDescription, i.ScriptCategory!, false, false, null, true, null)).ToList();
         return new BundleView(bundle.Id, bundle.Token.ToString("N"), bundle.Name, bundle.Os, bundle.IncludesAgent, bundle.Profile?.Name, bundle.Owner?.DisplayName,

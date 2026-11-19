@@ -99,6 +99,10 @@ namespace ThixInstall.Cloud.Data.Migrations
                     b.Property<long?>("CreateUserId")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("InstallChoices")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<long?>("PackageId")
                         .HasColumnType("bigint");
 
@@ -459,6 +463,10 @@ namespace ThixInstall.Cloud.Data.Migrations
                     b.Property<DateTime?>("IconFetchDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("InstallerOptions")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)");
+
                     b.Property<bool>("IsFeatured")
                         .HasColumnType("boolean");
 
@@ -520,6 +528,14 @@ namespace ThixInstall.Cloud.Data.Migrations
                         .HasColumnType("character varying(40)");
 
                     b.Property<string>("StorePackageFamilyName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ThixManifest")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ThixRepository")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 

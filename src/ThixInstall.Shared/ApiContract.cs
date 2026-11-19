@@ -26,6 +26,16 @@ public static class ApiContract
 
     public const string ProtocolHeader = "X-ThixInstall-Protocol";
 
+    /// <summary>
+    /// What a device can read beyond <see cref="ProtocolVersion"/>, comma separated (a request header). A device without
+    /// <see cref="ThixAppsFeature"/> does not know <see cref="InstallMethod.ThixApp"/>: the cloud leaves Thix apps out of its catalog and
+    /// sends them without a plan in actions, so an older ThixInstall still reads every answer.
+    /// </summary>
+    public const string FeaturesHeader = "X-ThixInstall-Features";
+
+    /// <summary>The device installs Thix apps with their install options (<see cref="InstallMethod.ThixApp"/>, SETUP-08).</summary>
+    public const string ThixAppsFeature = "thix-apps";
+
     // ---- public -------------------------------------------------------------------------------------------------------
 
     /// <summary>GET ?os=windows|macos&amp;arch=x64|arm64: <see cref="CatalogResponse"/>. Anonymous: public items only.</summary>

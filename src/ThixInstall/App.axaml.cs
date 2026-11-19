@@ -78,8 +78,30 @@ public partial class App : Application
             return;
         }
 
-        if (OperatingSystem.IsWindows() && RunWindowsSetupCommand(args))
+        SetupRequest setup;
+        try
         {
+            setup = InstallerOptions.Parse(args);
+        }
+        catch (BusinessException exception)
+        {
+            // SETUP-05/08: a quiet install with a wrong option does nothing and says why (exit code 2)
+            Log.Warning($"Setup arguments refused: {exception.Message}");
+            Console.Error.WriteLine(exception.Message);
+            EndProcess(InstallerOptions.RefusedExitCode);
+            return;
+        }
+
+        if (OperatingSystem.IsWindows() && RunWindowsSetupCommand(setup, args))
+        {
+            return;
+        }
+
+        if (OperatingSystem.IsMacOS() && setup.Action == SetupAction.Configure)
+        {
+            // macOS: ThixLauncher (or an administrator) places the bundle and then calls "ThixInstall --configure <options>"
+            InstallerOptions.Apply(setup.Choices, ExecutablePath, Log.Info);
+            EndProcess(0);
             return;
         }
 
@@ -237,22 +259,25 @@ public partial class App : Application
     // ---- Windows setup ------------------------------------------------------------------------------------------------
 
     /// <summary>
-    /// The setup commands without a window (each needs administrator rights; without them the program asks for them once):
-    ///  "--install [--quiet] [--autostart|--no-autostart] [--desktop] [--no-auto-update] [--cloud url --enroll-key key] [--log file]"
-    ///  "--update" (started by the service), "--uninstall [--quiet] [--delete-data]".
+    /// The setup commands without a window (SETUP-05/08 of MatDesign; each needs administrator rights, without them the program
+    /// asks for them once):
+    ///  "--quiet|--install [--desktop-shortcut=yes|no] [--autostart=yes|no] [--automatic-updates=yes|no] [--start]
+    ///   [--cloud url --enroll-key key] [--log file]" (the older "--no-autostart", "--desktop", "--no-auto-update" still work),
+    ///  "--update [options]" (started by the service), "--configure [options]" (only apply them to the installed ThixInstall),
+    ///  "--uninstall [--quiet] [--delete-data]".
+    /// Exit codes: 0 done, 1 failed, 2 options refused (nothing done, <see cref="InstallerOptions.Parse"/>), 3 installed but the
+    /// connection to the cloud failed.
     /// </summary>
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    private bool RunWindowsSetupCommand(string[] args)
+    private bool RunWindowsSetupCommand(SetupRequest setup, string[] args)
     {
-        var install = args.Contains(InstallService.InstallArgument);
-        var update = args.Contains(InstallService.UpdateArgument);
-        var uninstall = args.Contains(InstallService.UninstallArgument);
-        if (!install && !update && !uninstall)
+        if (setup.Action == SetupAction.None)
         {
             return false;
         }
 
-        if (uninstall && !args.Contains(InstallService.QuietArgument))
+        var uninstall = setup.Action == SetupAction.Uninstall;
+        if (uninstall && !setup.Quiet)
         {
             // "Installierte Apps" › Deinstallieren: the assistant asks, then runs "--uninstall --quiet" elevated.
             Setup.SetupWindow.Run(isUninstall: true, _ => EndProcess(0));
@@ -261,9 +286,16 @@ public partial class App : Application
 
         if (!Elevation.IsElevated)
         {
+            // "--start" is done here, as the user who started the setup: the elevated setup would start the app elevated
             Dispatcher.UIThread.Post(async () =>
             {
-                var code = await Elevation.RunElevatedAsync(ExecutablePath, string.Join(' ', args.Select(Elevation.Quote)));
+                var elevatedArgs = args.Where(arg => arg != InstallerOptions.StartArgument).Select(Elevation.Quote);
+                var code = await Elevation.RunElevatedAsync(ExecutablePath, string.Join(' ', elevatedArgs));
+                if (setup.Start && code is 0 or 3 && File.Exists(InstallService.InstalledExecutable))
+                {
+                    InstallService.StartInstalled(TrayArgument);
+                }
+
                 EndProcess(code ?? 1);
             });
             return true;
@@ -297,19 +329,26 @@ public partial class App : Application
                         InstallService.ScheduleProgramFolderRemoval();
                     }
                 }
-                else if (update)
+                else if (setup.Action == SetupAction.Configure)
                 {
-                    InstallService.Install(ExecutablePath, options: null, Report);
+                    if (!InstallService.IsInstalled)
+                    {
+                        throw new BusinessException("ThixInstall ist auf diesem Computer nicht installiert.");
+                    }
+
+                    AppPaths.IsMachineAgent = true;
+                    SettingsStore.Reset();
+                    InstallerOptions.Apply(setup.Choices, InstallService.InstalledExecutable, Report);
+                }
+                else if (setup.Action == SetupAction.Update)
+                {
+                    InstallService.Install(ExecutablePath, setup.Choices, Report);
                 }
                 else
                 {
-                    var options = new InstallOptions(
-                        Autostart: !args.Contains("--no-autostart"),
-                        DesktopShortcut: args.Contains("--desktop"),
-                        InstallUpdatesAutomatically: !args.Contains("--no-auto-update"));
                     var cloud = ArgumentAfter(args, "--cloud");
                     var key = ArgumentAfter(args, "--enroll-key");
-                    InstallService.Install(ExecutablePath, options, Report, startService: cloud is null);
+                    InstallService.Install(ExecutablePath, setup.Choices, Report, startService: cloud is null);
                     if (cloud is not null)
                     {
                         try
@@ -320,10 +359,16 @@ public partial class App : Application
                         catch (BusinessException exception)
                         {
                             Report($"Die Verbindung zur Cloud ist fehlgeschlagen: {exception.Message}");
-                            exitCode = 2;
+                            exitCode = 3;
                         }
 
                         InstallService.StartAgentService(Report);
+                    }
+
+                    // started elevated right away (not by the starter above): "--start" starts the app here, unless this is the system account
+                    if (setup.Start && !Elevation.IsLocalSystem && File.Exists(InstallService.InstalledExecutable))
+                    {
+                        InstallService.StartInstalled(TrayArgument);
                     }
                 }
             }

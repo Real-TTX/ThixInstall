@@ -200,7 +200,11 @@ public static class JobService
         }
 
         Notify(job);
-        return job;
+
+        // the app in the user's session downloads from the cloud of the job (a Thix app from the cache; downloads are public). Only its copy
+        // carries the address: the job kept here is still reported to the connected cloud.
+        var connection = CloudService.Connection;
+        return job with { CloudUrl = job.CloudUrl ?? (connection.IsConnected ? connection.ServerUrl : null) };
     }
 
     /// <summary>The app reports how a claimed user script ended.</summary>
@@ -248,7 +252,7 @@ public static class JobService
             throw new BusinessException("Dieser Auftrag läuft nicht beim Benutzer.");
         }
 
-        var context = new JobContext(null, null, (_, _) => { }, cancellationToken);
+        var context = new JobContext(job.CloudUrl, null, (_, _) => { }, cancellationToken);
         try
         {
             return await ExecuteAsync(job, context);

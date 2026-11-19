@@ -45,6 +45,12 @@ public sealed record PackageDto
 
     /// <summary>How the device recognises the installed app (inventory, update check).</summary>
     public DetectionRule? Detection { get; init; }
+
+    /// <summary>
+    /// A Thix app: what its setup offers (the block "installer" of its update manifest, SETUP-08) - desktop shortcut, autostart, automatic
+    /// updates, file types, each with its default. Null for every other app and for Thix apps whose manifest has none.
+    /// </summary>
+    public InstallerConfig? Installer { get; init; }
 }
 
 /// <summary>
@@ -92,6 +98,12 @@ public sealed record InstallPlan
 
     /// <summary>macOS: the name of the app bundle, e.g. "Firefox.app".</summary>
     public string? AppBundleName { get; init; }
+
+    /// <summary>
+    /// A Thix app in a bundle: the install options picked on the start page (null = the defaults of <see cref="PackageDto.Installer"/>). The device
+    /// passes them to the setup (<see cref="ThixAppSetup"/>).
+    /// </summary>
+    public InstallChoices? Choices { get; init; }
 }
 
 /// <summary>

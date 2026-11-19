@@ -25,7 +25,8 @@ public static class ApiEndpoints
         api.MapGet("/api/v1/bundles/{token}", async (HttpContext http, AppDbContext db, string token, string? arch) =>
         {
             var bundle = await BundleService.DtoAsync(db, token, ApiContract.ParseArchitecture(arch) ?? CpuArchitecture.X64, http.RequestAborted);
-            return bundle is null ? Error(StatusCodes.Status404NotFound, "Dieses Paket gibt es nicht (mehr).") : Json(bundle);
+            return bundle is null ? Error(StatusCodes.Status404NotFound, "Dieses Paket gibt es nicht (mehr).")
+                : Json(ReadsThixApps(http) ? bundle : bundle with { Packages = CatalogService.WithoutThixApps(bundle.Packages) });
         });
         api.MapPost(ApiContract.Enroll, EnrollAsync).RequireRateLimiting("signin");
         api.MapGet(ApiContract.AgentManifest, async (HttpContext http, AppDbContext db) =>
@@ -68,7 +69,11 @@ public static class ApiEndpoints
             return outcome.Ok ? Results.NoContent() : Error(StatusCodes.Status409Conflict, outcome.Error!, outcome.Field);
         });
         device.MapGet(ApiContract.ActionsWait, WaitAsync);
-        device.MapGet(ApiContract.Actions, async (HttpContext http, AppDbContext db) => Json(await ActionService.OpenAsync(db, DeviceOf(http), http.RequestAborted)));
+        device.MapGet(ApiContract.Actions, async (HttpContext http, AppDbContext db) =>
+        {
+            var open = await ActionService.OpenAsync(db, DeviceOf(http), http.RequestAborted);
+            return Json(ReadsThixApps(http) ? open : open with { Actions = open.Actions.Select(a => a with { Package = CatalogService.WithoutThixApp(a.Package) }).ToList() });
+        });
         device.MapPost("/api/v1/device/actions/{id:long}/start", async (HttpContext http, AppDbContext db, long id) =>
         {
             var outcome = await ActionService.StartAsync(db, DeviceOf(http), id, http.RequestAborted);
@@ -116,8 +121,13 @@ public static class ApiEndpoints
         }
 
         http.Response.Headers.CacheControl = "no-store";
-        return Json(await CatalogService.CatalogAsync(db, device?.Actor, target.Value, architecture, http.RequestAborted));
+        var catalog = await CatalogService.CatalogAsync(db, device?.Actor, target.Value, architecture, http.RequestAborted);
+        return Json(ReadsThixApps(http) ? catalog : catalog with { Packages = CatalogService.WithoutThixApps(catalog.Packages) });
     }
+
+    /// <summary>Whether the device names the feature "thix-apps" (<see cref="ApiContract.FeaturesHeader"/>): an older ThixInstall cannot read them.</summary>
+    private static bool ReadsThixApps(HttpContext http) =>
+        http.Request.Headers[ApiContract.FeaturesHeader].ToString().Split(',', StringSplitOptions.TrimEntries).Contains(ApiContract.ThixAppsFeature);
 
     private static async Task<IResult> IconAsync(HttpContext http, AppDbContext db, long id)
     {

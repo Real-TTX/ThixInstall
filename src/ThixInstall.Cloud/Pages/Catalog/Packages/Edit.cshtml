@@ -42,7 +42,19 @@
                               hint="Bei einer .msi leer lassen: /qn /norestart." />
                     <ti-field name="DirectSha256" label="SHA-256" optional value="@Model.DirectSha256" mono maxlength="64" show-if="WindowsMethod" show-value="Direct" hint="Wenn angegeben, prüft die Cloud den Download." />
                     <ti-field name="DirectVersion" label="Version" optional value="@Model.DirectVersion" maxlength="60" show-if="WindowsMethod" show-value="Direct,Upload" hint="Für die Anzeige von Updates: bei einer neuen Datei die Version erhöhen." />
-                    <ti-field name="DetectDisplayName" label="Erkennen an (Name unter „Installierte Apps“)" optional value="@Model.DetectDisplayName" maxlength="200" placeholder="@Model.Name" show-if="WindowsMethod" show-value="Winget,MicrosoftStore,Chocolatey,Direct,Upload"
+                    <ti-field name="ThixRepository" id="ThixRepository" label="GitHub-Repository" value="@Model.ThixRepository" mono required maxlength="200" placeholder="Real-TTX/ThixFred" show-if="WindowsMethod" show-value="ThixApp"
+                              hint="Wo die App ihre Builds veröffentlicht (Release-Kanal „release-channel“)." msg-required="Bitte das Repository angeben." />
+                    <ti-field name="ThixManifest" id="ThixManifest" label="Update-Manifest" optional value="@Model.ThixManifest" mono maxlength="200" placeholder="thixfred-update.json" show-if="WindowsMethod" show-value="ThixApp"
+                              hint="Leer: der Name des Repositorys in Kleinbuchstaben mit -update.json. Gilt für Windows und macOS." />
+                    @if (Model.Installer is { } installer)
+                    {
+                        <div class="mat-field" data-show-if="WindowsMethod" data-show-value="ThixApp">
+                            <span class="mat-label">Installationsoptionen (aus dem Update-Manifest)</span>
+                            <span class="mat-muted">@Ui.InstallerSummary(installer)</span>
+                            <span class="mat-hint">Wer die App auf der Startseite auswählt, kann sie ändern; Geräte, Profile und Aufträge nehmen die Vorgaben.</span>
+                        </div>
+                    }
+                    <ti-field name="DetectDisplayName" label="Erkennen an (Name unter „Installierte Apps“)" optional value="@Model.DetectDisplayName" maxlength="200" placeholder="@Model.Name" show-if="WindowsMethod" show-value="Winget,MicrosoftStore,Chocolatey,Direct,Upload,ThixApp"
                               hint="Der Anfang des Namens, z. B. „Mozilla Firefox“. Mit ^ am Anfang ein regulärer Ausdruck. Leer: der Name der App." />
                 </div>
             </div>
@@ -66,8 +78,20 @@
                     <ti-field name="MacFile" kind="file" label="@(Model.MacUploadFileName is null ? "Installer" : "Neuer Installer")" optional="@(Model.MacUploadFileName is not null)" accept=".dmg,.pkg,.zip" max-size="2GB" show-if="MacMethod" show-value="Upload"
                               hint="@(Model.MacUploadFileName is null ? "DMG, PKG oder ZIP bis 2 GB. Die Cloud hält die Datei und liefert sie an die Geräte." : $"Hochgeladen: {Model.MacUploadFileName}. Eine neue Datei ersetzt sie.")" />
                     <ti-field name="MacDirectVersion" label="Version" optional value="@Model.MacDirectVersion" maxlength="60" show-if="MacMethod" show-value="Direct,Upload" hint="Für die Anzeige von Updates: bei einer neuen Datei die Version erhöhen." />
-                    <ti-field name="MacAppBundleName" label="Name der App" optional value="@Model.MacAppBundleName" maxlength="200" placeholder="Firefox.app" show-if="MacMethod" show-value="HomebrewCask,Direct,Upload"
-                              hint="Woran ThixInstall die installierte App in /Programme erkennt. Beim Cask leer: was der Cask nennt; bei dmg und zip nötig." />
+                    <ti-field name="ThixRepository" id="ThixRepository" label="GitHub-Repository" value="@Model.ThixRepository" mono required maxlength="200" placeholder="Real-TTX/ThixFred" show-if="MacMethod" show-value="ThixApp"
+                              hint="Wo die App ihre Builds veröffentlicht (Release-Kanal „release-channel“)." msg-required="Bitte das Repository angeben." />
+                    <ti-field name="ThixManifest" id="ThixManifest" label="Update-Manifest" optional value="@Model.ThixManifest" mono maxlength="200" placeholder="thixfred-update.json" show-if="MacMethod" show-value="ThixApp"
+                              hint="Leer: der Name des Repositorys in Kleinbuchstaben mit -update.json. Gilt für Windows und macOS." />
+                    @if (Model.Installer is { } installer)
+                    {
+                        <div class="mat-field" data-show-if="MacMethod" data-show-value="ThixApp">
+                            <span class="mat-label">Installationsoptionen (aus dem Update-Manifest)</span>
+                            <span class="mat-muted">@Ui.InstallerSummary(installer)</span>
+                            <span class="mat-hint">Wer die App auf der Startseite auswählt, kann sie ändern; Geräte, Profile und Aufträge nehmen die Vorgaben.</span>
+                        </div>
+                    }
+                    <ti-field name="MacAppBundleName" label="Name der App" optional value="@Model.MacAppBundleName" maxlength="200" placeholder="Firefox.app" show-if="MacMethod" show-value="HomebrewCask,Direct,Upload,ThixApp"
+                              hint="Woran ThixInstall die installierte App in /Programme erkennt. Beim Cask leer: was der Cask nennt; bei dmg und zip nötig; bei einer Thix-App leer: der Name der App mit .app." />
                 </div>
             </div>
             <ti-buttons save="Speichern und auflösen" save-icon="refresh" back="/Catalog/Packages" delete-handler="Delete" delete-confirm="@deleteConfirm" />

@@ -6,7 +6,8 @@ namespace ThixInstall.Cloud.Business;
 
 /// <summary>
 /// The catalog a new cloud starts with: popular apps with their winget, Chocolatey and Homebrew names, and a few example scripts per system. Written
-/// once (the setting "Seeded" remembers it), so what an administrator deletes stays deleted.
+/// once (the setting "Seeded" remembers it), so what an administrator deletes stays deleted. The Thix apps (ThixFred, ThixClip, ThixNote: their update
+/// manifests, with the install options of SETUP-08) come once more for clouds that were seeded before them (the setting "SeededThixApps").
 /// </summary>
 public static class SeedData
 {
@@ -56,6 +57,17 @@ public static class SeedData
         new("nextcloud", "Nextcloud", "Nextcloud", "Cloud-Speicher", "https://nextcloud.com/", "Dateien mit der eigenen Cloud abgleichen.", "Nextcloud.NextcloudDesktop", "nextcloud-client", "Nextcloud", "nextcloud"),
     ];
 
+    private sealed record ThixAppSeed(string Key, string Name, string Description, string Repository, string Manifest);
+
+    private static readonly ThixAppSeed[] ThixApps =
+    [
+        new("thixfred", "ThixFred", "Launcher: Programme starten und beenden, rechnen, Befehle – mit einem Tastenkürzel.", "Real-TTX/ThixFred", "thixfred-update.json"),
+        new("thixclip", "ThixClip", "Zwischenablage-Verlauf: holt zurück, was du kopiert hast – Texte, Links und Bilder.", "Real-TTX/ThixClip", "thixclip-update.json"),
+        new("thixnote", "ThixNote", "Notizen als Dateien: Markdown, Text und kennwortgeschützte Notizen mit Tabs.", "Real-TTX/ThixNote", "thixnote-update.json"),
+    ];
+
+    public const string ThixAppsSeededKey = "SeededThixApps";
+
     private sealed record ScriptSeed(string Key, string Name, string Description, string Category, TargetOs Os, ScriptShell Shell, ScriptContext Context, string Content);
 
     private static readonly ScriptSeed[] Scripts =
@@ -80,8 +92,53 @@ public static class SeedData
             "#!/bin/zsh\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\nbrew update && brew upgrade\n"),
     ];
 
-    /// <summary>Writes the catalog once (when the setting "Seeded" is not there yet).</summary>
+    /// <summary>Writes the catalog once (when the setting "Seeded" is not there yet), and the Thix apps once.</summary>
     public static async Task EnsureAsync(AppDbContext db, CancellationToken ct = default)
+    {
+        await EnsureCatalogAsync(db, ct);
+        await EnsureThixAppsAsync(db, ct);
+    }
+
+    /// <summary>The Thix apps (a source for Windows and macOS: the update manifest of the app's release channel). An app of that key stays as it is.</summary>
+    private static async Task EnsureThixAppsAsync(AppDbContext db, CancellationToken ct)
+    {
+        if (await SettingService.GetRawAsync(db, ThixAppsSeededKey, ct) is not null)
+        {
+            return;
+        }
+
+        var order = 0;
+        foreach (var app in ThixApps)
+        {
+            if (await db.Packages.IgnoreQueryFilters().AnyAsync(p => p.Key == app.Key, ct))
+            {
+                continue;
+            }
+
+            db.Packages.Add(new Package
+            {
+                Key = app.Key,
+                Name = app.Name,
+                Publisher = "Matthias Schmoldt",
+                Category = "Thix-Apps",
+                Homepage = $"https://github.com/{app.Repository}",
+                Description = app.Description,
+                IsPublic = true,
+                SortOrder = order++,
+                WindowsMethod = InstallMethod.ThixApp,
+                MacMethod = InstallMethod.ThixApp,
+                ThixRepository = app.Repository,
+                ThixManifest = app.Manifest,
+                // the homepage is the repository: its icon would be the one of GitHub (an administrator uploads the logo)
+                IconFetchDate = DateTime.UtcNow,
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+        await SettingService.SetAsync(db, ThixAppsSeededKey, DateTime.UtcNow.ToString("O"), ct);
+    }
+
+    private static async Task EnsureCatalogAsync(AppDbContext db, CancellationToken ct)
     {
         if (await SettingService.GetRawAsync(db, SettingService.SeededKey, ct) is not null)
         {

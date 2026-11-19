@@ -43,13 +43,13 @@
                      Text="ThixInstall installiert und aktualisiert Apps aus dem Katalog deiner ThixInstall.Cloud, still und für alle Benutzer. Es läuft im Infobereich der Taskleiste, ein Dienst erledigt die Arbeit im Hintergrund." />
           <Border x:Name="OptionsCard" Theme="{StaticResource Card}" Padding="18,2" Margin="0,0,0,14">
             <StackPanel>
-              <controls:SettingRow Title="Bei der Windows-Anmeldung starten" Description="Die App im Infobereich, für jeden Benutzer">
+              <controls:SettingRow x:Name="AutostartRow" Title="Bei der Windows-Anmeldung starten" Description="Die App im Infobereich, für jeden Benutzer">
                 <ToggleSwitch x:Name="AutostartToggle" IsChecked="True" OnContent="" OffContent="" AutomationProperties.Name="Bei der Windows-Anmeldung starten" />
               </controls:SettingRow>
-              <controls:SettingRow Title="Verknüpfung auf dem Desktop" Description="Ein Startmenü-Eintrag wird immer angelegt">
+              <controls:SettingRow x:Name="DesktopRow" Title="Verknüpfung auf dem Desktop" Description="Ein Startmenü-Eintrag wird immer angelegt">
                 <ToggleSwitch x:Name="DesktopToggle" OnContent="" OffContent="" AutomationProperties.Name="Verknüpfung auf dem Desktop" />
               </controls:SettingRow>
-              <controls:SettingRow Title="Updates automatisch installieren" Description="Neue Versionen von ThixInstall ohne Rückfrage" BorderThickness="0">
+              <controls:SettingRow x:Name="AutoUpdateRow" Title="Updates automatisch installieren" Description="Neue Versionen von ThixInstall ohne Rückfrage" BorderThickness="0">
                 <ToggleSwitch x:Name="AutoUpdateToggle" IsChecked="True" OnContent="" OffContent="" AutomationProperties.Name="Updates automatisch installieren" />
               </controls:SettingRow>
             </StackPanel>

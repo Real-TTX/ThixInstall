@@ -29,6 +29,10 @@ public sealed class IndexModel : AppPageModel
     [BindProperty]
     public string ProfileId { get; set; } = string.Empty;
 
+    /// <summary>The install options of the picked Thix apps, by package id ("Options[12].Autostart"); a hidden card posts nothing.</summary>
+    [BindProperty]
+    public Dictionary<long, InstallOptionsForm> Options { get; set; } = [];
+
     public TargetOs Os { get; private set; } = TargetOs.Windows;
 
     public bool SignedIn => Me.IsAuthenticated;
@@ -58,7 +62,7 @@ public sealed class IndexModel : AppPageModel
         Os = ApiContract.ParseOs(OsQuery) ?? TargetOs.Windows;
         long? profile = long.TryParse(ProfileId, out var id) ? id : null;
         var outcome = await BundleService.CreateAsync(Db, SignedIn ? Actor : null,
-            new BundleRequest(Os, PackageIds, ScriptIds, Name, SignedIn && IncludesAgent, SignedIn ? profile : null), HttpContext.RequestAborted);
+            new BundleRequest(Os, PackageIds, ScriptIds, Name, SignedIn && IncludesAgent, SignedIn ? profile : null, Choices()), HttpContext.RequestAborted);
         if (!outcome.Ok)
         {
             Error = outcome.Error;
@@ -98,10 +102,45 @@ public sealed class IndexModel : AppPageModel
         }
     }
 
+    /// <summary>Whether a switch of a Thix app is on: what was posted (a page shown again after an error), else the default of the app.</summary>
+    public bool IsOn(long packageId, string option, bool fallback)
+    {
+        if (!Options.TryGetValue(packageId, out var posted))
+        {
+            return fallback;
+        }
+
+        return option switch
+        {
+            nameof(InstallOptionsForm.DesktopShortcut) => posted.DesktopShortcut ?? fallback,
+            nameof(InstallOptionsForm.Autostart) => posted.Autostart ?? fallback,
+            nameof(InstallOptionsForm.AutomaticUpdates) => posted.AutomaticUpdates ?? fallback,
+            _ => posted.FileTypes?.Contains(option, StringComparer.OrdinalIgnoreCase) ?? fallback,
+        };
+    }
+
+    /// <summary>The posted options as choices (the business layer keeps only what each app offers).</summary>
+    private Dictionary<long, InstallChoices> Choices() => Options.ToDictionary(
+        option => option.Key,
+        option => new InstallChoices(option.Value.DesktopShortcut, option.Value.Autostart, option.Value.AutomaticUpdates,
+            option.Value.FileTypes?.Where(type => !string.IsNullOrWhiteSpace(type)).ToList()));
+
     /// <summary>A Mac sees the Mac apps first; everybody else the Windows apps.</summary>
     private TargetOs GuessOs()
     {
         var agent = Request.Headers.UserAgent.ToString();
         return agent.Contains("Macintosh", StringComparison.OrdinalIgnoreCase) || agent.Contains("Mac OS X", StringComparison.OrdinalIgnoreCase) ? TargetOs.MacOS : TargetOs.Windows;
     }
+}
+
+/// <summary>The switches of one Thix app on the start page (SETUP-08). <see cref="FileTypes"/> always posts an empty value first, so "none" is "none".</summary>
+public sealed class InstallOptionsForm
+{
+    public bool? DesktopShortcut { get; set; }
+
+    public bool? Autostart { get; set; }
+
+    public bool? AutomaticUpdates { get; set; }
+
+    public List<string>? FileTypes { get; set; }
 }

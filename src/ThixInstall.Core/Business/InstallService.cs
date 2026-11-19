@@ -5,28 +5,27 @@ using Microsoft.Win32;
 using ThixInstall.Core.Infrastructure;
 using ThixInstall.Core.Models;
 using ThixInstall.Core.Platform;
+using ThixInstall.Shared;
 
 namespace ThixInstall.Core.Business;
-
-/// <summary>The choices of the setup assistant; an update (null) keeps what is installed.</summary>
-public sealed record InstallOptions(bool Autostart, bool DesktopShortcut, bool InstallUpdatesAutomatically = true);
 
 /// <summary>
 /// Windows only (macOS: the app bundle, <see cref="MacAppBundle"/>). ThixInstall installs itself, without an installer
 /// tool, for the whole computer (it installs software for everybody, so it needs administrator rights once):
 ///   %ProgramFiles%\ThixInstall\ThixInstall.exe, the service "ThixInstall Agent" (LocalSystem, starts with Windows: the
-///   agent), the Start menu entry and optionally a desktop shortcut for all users, the autostart of the app (HKLM Run) and
-///   the entry in "Installierte Apps". The agent's data lives in %ProgramData%\ThixInstall (SYSTEM and administrators only).
+///   agent), the Start menu entry and – as the install options say (<see cref="InstallerOptions"/>, SETUP-08) – a desktop
+///   shortcut for all users, the autostart of the app (HKLM Run) and automatic updates; and the entry in "Installierte Apps".
+///   The agent's data lives in %ProgramData%\ThixInstall (SYSTEM and administrators only).
 /// The published ThixInstall.exe is the setup ("ThixInstallSetup.exe"); "--update" is the silent update the service starts,
 /// "--uninstall" the uninstaller.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public static class InstallService
 {
-    public const string InstallArgument = "--install";
-    public const string UpdateArgument = UpdateService.WindowsUpdateArgument;
-    public const string UninstallArgument = "--uninstall";
-    public const string QuietArgument = "--quiet";
+    public const string InstallArgument = InstallerOptions.InstallArgument;
+    public const string UpdateArgument = InstallerOptions.UpdateArgument;
+    public const string UninstallArgument = InstallerOptions.UninstallArgument;
+    public const string QuietArgument = InstallerOptions.QuietArgument;
     public const string ServiceArgument = "--service";
     public const string ExecutableName = "ThixInstall.exe";
     public const string ServiceName = "ThixInstallAgent";
@@ -88,18 +87,19 @@ public static class InstallService
         string.Equals(Path.GetFullPath(path), Path.GetFullPath(InstalledExecutable), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Installs or updates (administrator rights needed). <paramref name="options"/> null = update: shortcuts and autostart
-    /// stay as they are. <paramref name="startService"/> false: the caller connects the device first and then starts the
+    /// Installs or updates (administrator rights needed) with the install options (SETUP-08): what <paramref name="choices"/>
+    /// leaves open (null, or a value of null) an installed ThixInstall keeps as it is and a first install takes from
+    /// installer.json. <paramref name="startService"/> false: the caller connects the device first and then starts the
     /// service with <see cref="StartAgentService"/>.
     /// </summary>
-    public static void Install(string sourceExecutable, InstallOptions? options, Action<string> log, bool startService = true)
+    public static void Install(string sourceExecutable, InstallChoices? choices, Action<string> log, bool startService = true)
     {
         if (!Elevation.IsElevated)
         {
             throw new BusinessException("Für die Installation werden Administratorrechte benötigt.");
         }
 
-        var isUpdate = options is null;
+        var isUpdate = IsInstalled;
         log(isUpdate ? $"Aktualisiere ThixInstall in {ProgramFolder}" : $"Installiere ThixInstall nach {ProgramFolder}");
         StopService(log);
         SignalRunningApps();
@@ -113,14 +113,6 @@ public static class InstallService
 
         CreateShortcut(StartMenuShortcut);
         log("Startmenü-Eintrag angelegt");
-        if (options?.DesktopShortcut ?? HasDesktopShortcut)
-        {
-            CreateShortcut(DesktopShortcut);
-            log("Desktop-Verknüpfung angelegt");
-        }
-
-        WriteUninstallEntry();
-        log("Eintrag unter „Installierte Apps“ geschrieben");
 
         // The agent's folder: machine-wide, only for SYSTEM and administrators (it holds the device token).
         AppPaths.IsMachineAgent = true;
@@ -128,17 +120,12 @@ public static class InstallService
         Directory.CreateDirectory(AppPaths.AgentDirectory);
         Platform.Windows.MachineFolder.Secure(AppPaths.AgentDirectory);
 
-        if (options?.Autostart ?? AutostartService.IsEnabled())
-        {
-            AutostartService.WriteEntry(InstalledExecutable);
-            log("Autostart bei der Anmeldung eingerichtet");
-        }
+        // also an update writes them again: the autostart points at the installed file
+        var wanted = (choices ?? new InstallChoices()).Over(isUpdate ? InstallerOptions.Current() : InstallerOptions.Defaults);
+        InstallerOptions.Apply(wanted, InstalledExecutable, log);
 
-        if (options is not null)
-        {
-            SettingsStore.UpdateAgent(settings => settings with { InstallUpdatesAutomatically = options.InstallUpdatesAutomatically });
-            log(options.InstallUpdatesAutomatically ? "Updates werden automatisch installiert" : "Updates werden nur angeboten");
-        }
+        WriteUninstallEntry();
+        log("Eintrag unter „Installierte Apps“ geschrieben");
 
         RegisterService(log);
         if (startService)
@@ -400,6 +387,19 @@ public static class InstallService
         }
 
         return process.ExitCode;
+    }
+
+    /// <summary>The desktop shortcut for all users on or off (install options).</summary>
+    internal static void SetDesktopShortcut(bool wanted)
+    {
+        if (wanted)
+        {
+            CreateShortcut(DesktopShortcut);
+        }
+        else
+        {
+            DeleteFile(DesktopShortcut, quiet: true);
+        }
     }
 
     private static void CreateShortcut(string path)

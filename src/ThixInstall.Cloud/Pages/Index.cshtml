@@ -61,7 +61,7 @@
                     @foreach (var p in group.Items)
                     {
                         <label class="mat-tile ti-tile @(p.IsFeatured ? "ti-tile--featured" : "")" data-tile-text="@($"{p.Name} {p.Note} {p.Category} {p.Description}")">
-                            <input class="ti-tile__check" type="checkbox" name="PackageIds" value="@p.Id" data-select-row checked="@Model.PackageIds.Contains(p.Id)" aria-label="@p.Name" />
+                            <input class="ti-tile__check" type="checkbox" id="pkg-@p.Id" name="PackageIds" value="@p.Id" data-select-row checked="@Model.PackageIds.Contains(p.Id)" aria-label="@p.Name" />
                             @Ui.AppIcon(p.Id, p.Key, p.Name, p.HasIcon)
                             <span class="ti-tile__text">
                                 <span class="ti-tile__name">@p.Name</span>
@@ -95,6 +95,43 @@
 
         <p class="mat-muted ti-picker__nothing" data-tile-empty hidden>Nichts gefunden.</p>
     </div>
+
+    @* The install options of a picked Thix app (SETUP-08): the questions of its setup, prefilled with its defaults; a card shows while its tile is ticked *@
+    @foreach (var p in Model.PackageGroups.SelectMany(g => g.Items).Where(p => p.Installer is not null))
+    {
+        var config = p.Installer!;
+        var prefix = $"Options[{p.Id}]";
+        <div class="mat-card ti-options" data-show-if="#pkg-@p.Id" data-thix-options="@p.Key" hidden>
+            <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("settings")@p.Name einrichten</h2></div>
+            <div class="mat-card__body mat-form">
+                @if (config.DesktopShortcut is { } shortcut)
+                {
+                    <ti-field name="@($"{prefix}.DesktopShortcut")" id="@($"opt-{p.Id}-shortcut")" kind="switch" label="Verknüpfung auf dem Desktop" value="@Model.IsOn(p.Id, nameof(InstallOptionsForm.DesktopShortcut), shortcut.Default).ToString()" />
+                }
+                @if (config.Autostart is { } autostart)
+                {
+                    <ti-field name="@($"{prefix}.Autostart")" id="@($"opt-{p.Id}-autostart")" kind="switch" label="Bei der Anmeldung starten" value="@Model.IsOn(p.Id, nameof(InstallOptionsForm.Autostart), autostart.Default).ToString()" />
+                }
+                @if (config.AutomaticUpdates is { } updates)
+                {
+                    <ti-field name="@($"{prefix}.AutomaticUpdates")" id="@($"opt-{p.Id}-updates")" kind="switch" label="Updates automatisch installieren" value="@Model.IsOn(p.Id, nameof(InstallOptionsForm.AutomaticUpdates), updates.Default).ToString()" />
+                }
+                @if (config.FileTypes.Count > 0)
+                {
+                    <fieldset class="mat-field mat-fieldset">
+                        <legend class="mat-legend">Dateitypen mit @p.Name öffnen</legend>
+                        <input type="hidden" name="@($"{prefix}.FileTypes")" value="" />
+                        <div class="mat-checks">
+                            @foreach (var type in config.FileTypes)
+                            {
+                                <label class="mat-check"><input type="checkbox" name="@($"{prefix}.FileTypes")" value="@type.Extension" checked="@Model.IsOn(p.Id, type.Extension, type.Default)" /><span class="mat-check__text">@type.Extension @(string.IsNullOrEmpty(type.Name) ? "" : $"({type.Name})")</span></label>
+                            }
+                        </div>
+                    </fieldset>
+                }
+            </div>
+        </div>
+    }
 
     @if (Model.SignedIn)
     {

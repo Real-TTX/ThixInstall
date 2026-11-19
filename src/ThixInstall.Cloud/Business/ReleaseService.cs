@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using ThixInstall.Cloud.Data;
 using ThixInstall.Shared;
@@ -61,8 +62,16 @@ public static class ReleaseService
         var errors = new List<string>();
         var results = new Dictionary<(TargetOs, CpuArchitecture), ResolvedRelease?>();
 
-        await ResolveSystemAsync(TargetOs.Windows, () => WindowsAsync(package, settings.GitHubToken, ct));
-        await ResolveSystemAsync(TargetOs.MacOS, () => MacAsync(package, ct));
+        // a Thix app: one manifest for both systems, read once; its install options are kept with the app (the start page asks them)
+        Task<ThixAppManifest>? thixManifest = null;
+        Task<ThixAppManifest> ThixManifestAsync() => thixManifest ??= ReadThixManifestAsync(package, ct);
+
+        await ResolveSystemAsync(TargetOs.Windows, () => WindowsAsync(package, settings.GitHubToken, ThixManifestAsync, ct));
+        await ResolveSystemAsync(TargetOs.MacOS, () => MacAsync(package, ThixManifestAsync, ct));
+        if (package.WindowsMethod != InstallMethod.ThixApp && package.MacMethod != InstallMethod.ThixApp)
+        {
+            package.InstallerOptions = null;
+        }
 
         var existing = await db.Releases.Where(r => r.PackageId == packageId).ToListAsync(ct);
         var now = DateTime.UtcNow;
@@ -152,10 +161,13 @@ public static class ReleaseService
         }
     }
 
-    private static async Task<IReadOnlyDictionary<CpuArchitecture, ResolvedRelease>?> WindowsAsync(Package package, string? gitHubToken, CancellationToken ct)
+    private static async Task<IReadOnlyDictionary<CpuArchitecture, ResolvedRelease>?> WindowsAsync(Package package, string? gitHubToken, Func<Task<ThixAppManifest>> thixManifest,
+        CancellationToken ct)
     {
         switch (package.WindowsMethod)
         {
+            case InstallMethod.ThixApp when ThixAppResolver.IsValidRepository(package.ThixRepository):
+                return ThixAppResolver.ReleasesFor(await thixManifest(), package.ThixRepository!, AppBundleOf(package), TargetOs.Windows);
             case InstallMethod.Winget when !string.IsNullOrWhiteSpace(package.WingetId):
                 return await WingetResolver.ResolveAsync(package.WingetId!, gitHubToken, ct);
             case InstallMethod.Chocolatey when !string.IsNullOrWhiteSpace(package.ChocoId):
@@ -172,10 +184,12 @@ public static class ReleaseService
         }
     }
 
-    private static async Task<IReadOnlyDictionary<CpuArchitecture, ResolvedRelease>?> MacAsync(Package package, CancellationToken ct)
+    private static async Task<IReadOnlyDictionary<CpuArchitecture, ResolvedRelease>?> MacAsync(Package package, Func<Task<ThixAppManifest>> thixManifest, CancellationToken ct)
     {
         switch (package.MacMethod)
         {
+            case InstallMethod.ThixApp when ThixAppResolver.IsValidRepository(package.ThixRepository):
+                return ThixAppResolver.ReleasesFor(await thixManifest(), package.ThixRepository!, AppBundleOf(package), TargetOs.MacOS);
             case InstallMethod.HomebrewCask or InstallMethod.Homebrew when !string.IsNullOrWhiteSpace(package.BrewName):
                 return await BrewResolver.ResolveAsync(package.BrewName!, package.MacMethod == InstallMethod.HomebrewCask, ct);
             case InstallMethod.Direct when Text.IsHttpUrl(package.MacDirectUrl):
@@ -184,6 +198,35 @@ public static class ReleaseService
                 return Both(Upload(package.MacUploadSha256!, package.MacUploadFileName, TargetOs.MacOS, package.MacDirectVersion, null, package.MacAppBundleName));
             default:
                 return null;
+        }
+    }
+
+    /// <summary>The manifest of a Thix app; what its setup offers is stored with the package (null when the manifest has no "installer" block).</summary>
+    private static async Task<ThixAppManifest> ReadThixManifestAsync(Package package, CancellationToken ct)
+    {
+        var manifest = await ThixAppResolver.ReadAsync(package.ThixRepository!, package.ThixManifest, ct);
+        package.InstallerOptions = manifest.Installer is null ? null : JsonSerializer.Serialize(manifest.Installer, ApiContract.Json);
+        return manifest;
+    }
+
+    /// <summary>The app bundle of a Thix app on macOS: the name given, else "&lt;Name&gt;.app".</summary>
+    private static string AppBundleOf(Package package) => string.IsNullOrWhiteSpace(package.MacAppBundleName) ? package.Name + ".app" : package.MacAppBundleName;
+
+    /// <summary>What the setup of a Thix app offers, as stored with the package (null for other apps and when the manifest has none).</summary>
+    public static InstallerConfig? InstallerOf(Package package)
+    {
+        if (string.IsNullOrEmpty(package.InstallerOptions))
+        {
+            return null;
+        }
+
+        try
+        {
+            return ThixAppSetup.Sanitize(JsonSerializer.Deserialize<InstallerConfig>(package.InstallerOptions, ApiContract.Json));
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 
@@ -307,8 +350,8 @@ public static class ReleaseService
         var route = (os == TargetOs.Windows ? package.WindowsRoute : package.MacRoute) ?? defaultRoute;
         if (release is null || release.Method != method)
         {
-            // a download or an upload needs its release (the address in the cloud); the package managers work without one
-            return method is InstallMethod.Direct or InstallMethod.Upload
+            // a download, an upload or a Thix app needs its release (the address in the cloud); the package managers work without one
+            return method is InstallMethod.Direct or InstallMethod.Upload or InstallMethod.ThixApp
                 ? null
                 : new InstallPlan
                 {
@@ -349,6 +392,7 @@ public static class ReleaseService
         InstallMethod.Upload => "Eigene Datei",
         InstallMethod.Homebrew => "Homebrew-Formel",
         InstallMethod.HomebrewCask => "Homebrew-Cask",
+        InstallMethod.ThixApp => "Thix-App",
         _ => "–",
     };
 

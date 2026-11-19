@@ -83,7 +83,7 @@
             <li class="mat-item">
                 <div class="mat-item__main">
                     <span class="mat-item__lead">@Ui.AppIcon(p.Id, p.Key, p.Name, p.HasIcon, "sm")</span>
-                    <span class="mat-item__body"><span class="mat-item__title">@p.Name</span><span class="mat-item__text">@p.Category</span></span>
+                    <span class="mat-item__body"><span class="mat-item__title">@p.Name</span><span class="mat-item__text">@p.Category@(p.Note is null ? "" : " · " + p.Note)</span></span>
                 </div>
             </li>
         }

@@ -14,6 +14,9 @@ schickst. Eine einfache Version von Intune/Entra.
 - **winget, Microsoft Store, Chocolatey und Homebrew im Unterbau** – die Cloud löst die Installer auf (winget-Manifeste, Homebrew-API) und
   **cached die Downloads**: jedes Gerät lädt aus deiner Cloud, geprüft per SHA-256. Dazu direkte Downloads und **eigene Installer**
   (MSI, EXE, MSIX, DMG, PKG, ZIP), die du in die Cloud hochlädst – für Firmensoftware, die es in keinem Repository gibt.
+- **Thix-Apps** (ThixFred, ThixClip, ThixNote) direkt aus ihrem Release-Kanal: wer eine auf der Startseite ankreuzt, sieht die
+  Fragen ihres Setups – Desktop-Verknüpfung, Autostart, automatische Updates, Dateitypen, mit ihren Vorgaben – und das Gerät
+  installiert sie still mit genau diesen Antworten (MatDesign SETUP-08).
 - **App hinzufügen mit einem Klick**: Namen eingeben, die Cloud sucht in allen Quellen, schlägt je System den passenden Treffer vor und füllt
   Name, Herausgeber, Beschreibung, Homepage und Icon selbst aus.
 - **ThixInstall auf dem Gerät** (Tray / Menüleiste): Katalog, Updates (einzeln, alle, oder automatisch täglich), Skripte,
@@ -83,8 +86,19 @@ dafür einmal nach Administratorrechten. Still und mit Auto-Enrollment:
 ThixInstallSetup.exe --install --quiet --cloud https://install.example.com --enroll-key <Registrierungsschlüssel>
 ```
 
-Weitere Schalter: `--no-autostart`, `--desktop`, `--no-auto-update`, `--log <datei>`. Deinstallieren über „Installierte
-Apps“ oder `"%ProgramFiles%\ThixInstall\ThixInstall.exe" --uninstall --quiet [--delete-data]`.
+**Ohne Fenster** (ThixLauncher, Administratoren) – die Optionen des Setups als Argumente (MatDesign SETUP-05/08; was angeboten
+wird, steht in `src/ThixInstall.Core/installer.json` und im Update-Manifest unter `installer`):
+
+```
+ThixInstallSetup.exe --quiet --desktop-shortcut=yes --autostart=no --automatic-updates=yes [--start] [--cloud <url> --enroll-key <schlüssel>]
+ThixInstall.exe --configure --autostart=yes        # nur anwenden (macOS: nach dem Kopieren des Bundles)
+"%ProgramFiles%\ThixInstall\ThixInstall.exe" --uninstall --quiet [--delete-data]
+```
+
+Nicht angegebene Optionen: bei der Erstinstallation der Standard, bei einem Update bleibt es, wie es ist. Ein falscher Wert
+bricht mit Exit-Code 2 ab, ohne etwas zu installieren (Exit-Code 3: installiert, aber die Verbindung zur Cloud schlug fehl).
+Die älteren Schalter `--install`, `--no-autostart`, `--desktop`, `--no-auto-update` gelten weiter; dazu `--log <datei>`.
+Deinstallieren auch über „Installierte Apps“.
 
 **macOS** – das Paket von der Startseite laden (Zip mit `ThixInstall.app` und dem Ticket daneben) und ThixInstall öffnen,
 oder `ThixInstall-macOS-arm64.dmg` (Apple Silicon) bzw. `-x64.dmg` (Intel) aus dem Release-Kanal öffnen und ThixInstall in

@@ -193,7 +193,7 @@ public static class BundleService
         var program = Environment.ProcessPath ?? throw new BusinessException("Das Programm von ThixInstall wurde nicht gefunden.");
         if (OperatingSystem.IsWindows())
         {
-            InstallService.Install(program, new InstallOptions(Autostart: true, DesktopShortcut: false, InstallUpdatesAutomatically: true), Log.Info, startService: false);
+            InstallService.Install(program, InstallerOptions.Defaults, Log.Info, startService: false);
             AppPaths.IsMachineAgent = true;
             SettingsStore.Reset();
             var info = await CloudService.ConnectAsync(new ConnectRequest(ticket.CloudUrl, null, null, null, null), ticket.Token, startLoop: false, cancellationToken);
@@ -205,7 +205,7 @@ public static class BundleService
         {
             var installed = MacAppBundle.InstallIntoApplications();
             var info = await CloudService.ConnectAsync(new ConnectRequest(ticket.CloudUrl, null, null, null, null), ticket.Token, startLoop: false, cancellationToken);
-            AutostartService.WriteEntry(installed);
+            InstallerOptions.Apply(InstallerOptions.Defaults, installed, Log.Info);
             return $"Installiert und verbunden mit {info.UserDisplayName}";
         }
 

@@ -36,6 +36,7 @@ internal sealed class CloudClient : IDisposable
         _http.Timeout = Timeout.InfiniteTimeSpan;
         _http.DefaultRequestHeaders.UserAgent.ParseAdd($"ThixInstall/{AppInfo.BuildNumber}");
         _http.DefaultRequestHeaders.Add(ApiContract.ProtocolHeader, ApiContract.ProtocolVersion.ToString());
+        _http.DefaultRequestHeaders.Add(ApiContract.FeaturesHeader, ApiContract.ThixAppsFeature);
         if (token is not null)
         {
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

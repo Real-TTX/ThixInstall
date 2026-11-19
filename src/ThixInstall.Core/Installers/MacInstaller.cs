@@ -28,7 +28,7 @@ internal static class MacInstaller
         }
 
         return await InstallRoutes.RunAsync(routes, route => route == InstallRouteStep.Cache
-            ? InstallDownloadAsync(package, plan, context)
+            ? InstallDownloadAsync(package, plan, isUpdate, context)
             : BrewAsync(isUpdate ? "upgrade" : "install", plan.PackageId, plan.Method == InstallMethod.HomebrewCask, context), context);
     }
 
@@ -66,7 +66,7 @@ internal static class MacInstaller
         }
     }
 
-    private static async Task<JobOutcome> InstallDownloadAsync(PackageDto package, InstallPlan plan, JobContext context)
+    private static async Task<JobOutcome> InstallDownloadAsync(PackageDto package, InstallPlan plan, bool isUpdate, JobContext context)
     {
         string? file = null;
         string? mount = null;
@@ -88,7 +88,7 @@ internal static class MacInstaller
                         return JobOutcome.Fail(context, "Das Archiv konnte nicht entpackt werden.", result.Output, result.ExitCode);
                     }
 
-                    return await CopyAppAsync(FindApp(unpacked, plan.AppBundleName), context);
+                    return await PlaceAppAsync(package, plan, isUpdate, FindApp(unpacked, plan.AppBundleName), context);
                 }
 
                 default:
@@ -111,7 +111,7 @@ internal static class MacInstaller
                         return await InstallPackageAsync(pkg, context);
                     }
 
-                    return await CopyAppAsync(app, context);
+                    return await PlaceAppAsync(package, plan, isUpdate, app, context);
                 }
             }
         }
@@ -124,6 +124,44 @@ internal static class MacInstaller
 
             Downloads.Remove(file);
         }
+    }
+
+    /// <summary>
+    /// Copies the app to /Applications; a Thix app is then told its install options (SETUP-08): its own program with "--configure" and the
+    /// options (<see cref="ThixAppSetup.MacConfigureArguments"/>). Exit code 2 = the app refused them.
+    /// </summary>
+    private static async Task<JobOutcome> PlaceAppAsync(PackageDto package, InstallPlan plan, bool isUpdate, string? app, JobContext context)
+    {
+        var copied = await CopyAppAsync(app, context);
+        var arguments = plan.Method == InstallMethod.ThixApp ? ThixAppSetup.MacConfigureArguments(package.Installer, plan.Choices, isUpdate) : null;
+        if (!copied.Succeeded || app is null || arguments is null)
+        {
+            return copied;
+        }
+
+        var bundle = Path.Combine(Applications, Path.GetFileName(app));
+        var program = ThixAppInstall.MacExecutable(bundle);
+        if (program is null)
+        {
+            return JobOutcome.Fail(context, $"In {Path.GetFileName(bundle)} fehlt das Programm: die Installationsoptionen konnten nicht angewandt werden.");
+        }
+
+        context.Step($"{Path.GetFileName(bundle)}/Contents/MacOS/{Path.GetFileName(program)} {string.Join(' ', arguments)}");
+        context.Report($"Richte {package.Name} ein …");
+        var result = await ProcessRunner.RunAsync(program, arguments, TimeSpan.FromMinutes(2), context.Cancellation);
+        if (result.Cancelled)
+        {
+            return new JobOutcome(false, null, context.Combine(result.Output), "Abgebrochen.", Cancelled: true);
+        }
+
+        if (result.ExitCode == ThixAppSetup.RefusedExitCode)
+        {
+            return JobOutcome.Fail(context, ThixAppInstall.RefusedMessage(package, result.Output), result.Output, result.ExitCode);
+        }
+
+        return result.Succeeded()
+            ? new JobOutcome(true, 0, context.Combine(result.Output))
+            : JobOutcome.Fail(context, $"Die Installationsoptionen konnten nicht angewandt werden (Code {result.ExitCode?.ToString() ?? "–"}).", result.Output, result.ExitCode);
     }
 
     /// <summary>Copies an app bundle to /Applications, replacing an older one (which comes back if the copy fails).</summary>

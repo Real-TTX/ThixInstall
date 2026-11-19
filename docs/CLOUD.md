@@ -45,6 +45,8 @@ Business/  (statische Klassen, jede Prüfung mit Actor)
   ReleaseService        löst Quellen je OS/Architektur in PackageRelease auf (winget, Store, Chocolatey mit Version, Direkt, Upload,
                         Cask/Formel); InstallPlan für Geräte
   WingetResolver        winget-pkgs auf GitHub → neueste Version → Installer je Architektur/Scope/Sprache → Art + stille Parameter
+  ThixAppResolver       Thix-Apps: das Update-Manifest des Release-Kanals auf GitHub → Version, Setup bzw. Zip je Prozessor, der Block
+                        "installer" (SETUP-08, bereinigt: nur schlichte Endungen) → Package.InstallerOptions
   BrewResolver          formulae.brew.sh: Cask (dmg/zip mit einer App, pkg) oder Formel; Intel nimmt die passende "variation"
   DownloadCache         /api/v1/downloads/{id}: einmal laden, SHA-256 prüfen, in /data/cache ablegen, LRU über der eingestellten Größe;
                         hochgeladene Installer kommen aus /data/uploads
@@ -55,7 +57,7 @@ Business/  (statische Klassen, jede Prüfung mit Actor)
                         (source2.msix → SQLite, /data/sources/winget.db), StoreSource (storeedgefd: manifestSearch, packageManifests), ChocolateySource
                         (OData-Feed: Suche, neueste Version), BrewIndex (cask.json/formula.json, kompakt im Speicher), SourceFiles (Listen täglich neu)
   AgentService          Desktop-Pakete: Upload unter /data/agent oder GitHub-Release des Kanals (Manifest 10 min gemerkt, Dateien über den Cache)
-  BundleService         Pakete anlegen/lesen/löschen; Download: Windows = Setup + Ticket als Anhang, macOS = Zip der App + .thixinstall-Datei
+  BundleService         Pakete anlegen/lesen/löschen (je Thix-App die gewählten Installationsoptionen, im Plan als Choices); Download: Windows = Setup + Ticket als Anhang, macOS = Zip der App + .thixinstall-Datei
   DeviceService         Enrollment (Passwort, Profil-Schlüssel, Paket-Token), Token-Prüfung (nur SHA-256 gespeichert), Inventar, Profil, Entfernen
   ActionService         Aufträge: senden (nur mit Sync), Profil anwenden, Long Poll, start/finish/report, abbrechen, Listen
   ProfileService        Profile, Inhalte (neue Inhalte gehen sofort an die Geräte), Schlüssel, Registrierungs-Paket
@@ -73,13 +75,13 @@ wwwroot/                matui/ (Kopie), css/app.css (Akzent #0F7B6C, Präfix ti-
 
 | Seite | Wer | Inhalt |
 |---|---|---|
-| `/` | alle | Kacheln je Kategorie (beliebte zuerst), Windows/macOS umschaltbar (Vorgabe aus dem User-Agent), Suche, Skripte; Leiste „n ausgewählt · Paket erstellen“. Angemeldet: Name, „ThixInstall mitinstallieren“, Profil, „Nur ThixInstall herunterladen“. |
+| `/` | alle | Kacheln je Kategorie (beliebte zuerst), Windows/macOS umschaltbar (Vorgabe aus dem User-Agent), Suche, Skripte; eine angekreuzte Thix-App zeigt ihre Installationsoptionen (Schalter mit ihren Vorgaben); Leiste „n ausgewählt · Paket erstellen“. Angemeldet: Name, „ThixInstall mitinstallieren“, Profil, „Nur ThixInstall herunterladen“. |
 | `/b/{token}` | wer den Link hat | Inhalt, Download je Plattform, Anleitung, Link zum Weitergeben |
 | `/Devices` | Benutzer: eigene, Admin: alle | Liste mit Sync, Updates, offenen Aufträgen; Detail mit Tabs Übersicht · Software · Aufträge · Einstellungen (Profil, Entfernen); „Auftrag senden“ |
 | `/Actions` | wie Geräte | alle Aufträge mit Filter Status/Herkunft; Detail mit Ausgabe, Abbrechen (wartend) |
 | `/Bundles` | eigene, Admin alle/anonyme | Pakete mit Downloads; Detail, Löschen |
 | `/Catalog/Packages/Add` | Admin | „App hinzufügen“: Name suchen; Treffer je System (Windows: winget, Microsoft Store, Chocolatey; macOS: Cask, Formel) in Gruppen je Quelle, die beste Quelle zuerst, Vorschlag vorgewählt, Vorhandenes verlinkt; Kategorie; „App anlegen“ füllt alles aus den Quellen, holt das Icon und löst auf |
-| `/Catalog/Packages` | Admin | Apps; Bearbeiten mit Tabs Allgemein (Icon, sichtbar, beliebt) · Windows (winget/Store/Chocolatey/Direkt/eigene Datei, Weg auf dem Gerät, Erkennung) · macOS (Cask/Formel/Direkt/eigene Datei, Weg) · Versionen („Jetzt auflösen“); „Alle auflösen“ |
+| `/Catalog/Packages` | Admin | Apps; Bearbeiten mit Tabs Allgemein (Icon, sichtbar, beliebt) · Windows (winget/Store/Chocolatey/Direkt/eigene Datei/Thix-App, Weg auf dem Gerät, Erkennung) · macOS (Cask/Formel/Direkt/eigene Datei/Thix-App, Weg; Thix-App: Repository, Manifest, die gelesenen Installationsoptionen) · Versionen („Jetzt auflösen“); „Alle auflösen“ |
 | `/Catalog/Scripts` | Admin | Skripte; Tabs Allgemein · Skript (Shell, Kontext System/Benutzer, Text, Zeitgrenze) |
 | `/Profiles` | Admin | Tabs Allgemein · Inhalte (Reihenfolge) · Geräte („Auftrag an alle“) · Registrierung (Schlüssel, stille Installation, Download) |
 | `/Admin/Users`, `/Admin/Cache`, `/Admin/Settings` | Admin | Benutzer; Cache (Belegung, löschen, leeren); Einstellungen: Allgemein (öffentlicher Katalog, Cache-Größe, Weg zuerst: Cloud-Cache oder Paketmanager) · Desktop-App (Kanal, Uploads) · Quellen (GitHub-Token) |
@@ -91,6 +93,10 @@ Startseite öffentlich ist), `GET /api/v1/packages/{id}/icon`, `GET /api/v1/down
 `POST /api/v1/devices/enroll` (Rate-Limit), `GET /api/v1/agent/manifest`, `GET /api/v1/agent/{platform}`. Mit Geräte-Token: `GET/PUT /api/v1/device`,
 `PUT /api/v1/device/inventory` (409 ohne Sync), `GET /api/v1/device/actions/wait`, `GET /api/v1/device/actions` (leer ohne Sync),
 `POST …/{id}/start` (409 wenn abgebrochen/gestartet), `POST …/{id}/finish`, `POST /api/v1/device/actions/report`, `POST /api/v1/devices/logout`.
+
+Geräte nennen im Kopf `X-ThixInstall-Features`, was sie über das Protokoll hinaus lesen (`thix-apps`: die Quelle `ThixApp`). Fehlt `thix-apps`
+(ein älteres ThixInstall), lässt die Cloud Thix-Apps aus Katalog und Paket weg und schickt sie in Aufträgen ohne Plan – so liest jedes ältere
+Gerät weiter jede Antwort (der Auftrag schlägt dort mit einer Meldung fehl), bis es sich aktualisiert hat.
 
 **Das heruntergeladene Paket trägt seine ganze Konfiguration.** `/b/{token}/download` baut das `BundleTicket` mit `Bundle` = genau dem
 `BundleDto`, das `GET /api/v1/bundles/{token}?arch=<Architektur der Plattform>` liefern würde (Apps mit Installationsplänen, Skripte mit Inhalt,
@@ -128,6 +134,10 @@ CacheMaxGigabytes, DesktopChannel, GitHubToken, Seeded).
 - Der `InstallPlan` trägt Cache und Paketmanager (`WingetId`, `ChocoId`) und den Weg, den das Gerät zuerst nimmt (`Route`): die Wahl der App
   (`Package.WindowsRoute`/`MacRoute`, leer = Einstellung) oder die Einstellung `InstallRoute` (Standard: Cloud-Cache zuerst). Bei winget als
   Quelle ist die Chocolatey-Id der Ausweichweg (optional, geprüft); bei Chocolatey als Quelle die winget-Id, soweit bekannt.
+- Thix-Apps: `https://github.com/<repo>/releases/download/release-channel/<manifest>` (leer: Repository-Name in Kleinbuchstaben + `-update.json`);
+  Windows nimmt `packages.win-x64` (oder `setup`) für x64 und Arm, macOS `osx-arm64`/`osx-x64` (Zip mit `<Name>.app`). Der Block `installer` wird bei
+  jedem Auflösen neu gelesen; ist GitHub nicht erreichbar, bleiben Release und Optionen. Eine neue Cloud – und einmal jede ältere (Einstellung
+  `SeededThixApps`) – legt ThixFred, ThixClip und ThixNote in der Kategorie „Thix-Apps“ an (ohne Icon-Suche: die Homepage ist GitHub).
 - Icons: einmal pro Paket `apple-touch-icon.png`, dann `favicon.ico` der Homepage (nur echte Bilder, erkannt an den ersten Bytes); hochgeladene
   SVGs ohne `<script>` und mit eigener CSP ausgeliefert.
 

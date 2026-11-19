@@ -62,6 +62,30 @@ public static partial class Ui
     }
 
     /// <summary>"1 App", "3 Apps".</summary>
+    /// <summary>What the setup of a Thix app offers, in words: "Desktop-Verknüpfung (aus) · Autostart (an) · Dateitypen .md (an)".</summary>
+    public static string InstallerSummary(ThixInstall.Shared.InstallerConfig config)
+    {
+        static string State(bool on) => on ? "an" : "aus";
+        var parts = new List<string>();
+        if (config.DesktopShortcut is { } shortcut)
+        {
+            parts.Add($"Desktop-Verknüpfung ({State(shortcut.Default)})");
+        }
+
+        if (config.Autostart is { } autostart)
+        {
+            parts.Add($"Autostart ({State(autostart.Default)})");
+        }
+
+        if (config.AutomaticUpdates is { } updates)
+        {
+            parts.Add($"Automatische Updates ({State(updates.Default)})");
+        }
+
+        parts.AddRange(config.FileTypes.Select(type => $"{type.Extension} öffnen ({State(type.Default)})"));
+        return parts.Count == 0 ? "Keine – die App fragt nichts." : string.Join(" · ", parts);
+    }
+
     public static string Count(int n, string one, string many) => n == 1 ? $"1 {one}" : $"{Number(n)} {many}";
 
     public static string OsName(ThixInstall.Shared.TargetOs os) => os == ThixInstall.Shared.TargetOs.MacOS ? "macOS" : "Windows";
