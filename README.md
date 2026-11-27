@@ -114,7 +114,9 @@ Kommandozeilen-Werkzeuge (Formeln) brauchen Homebrew. Die App ist (noch) ad hoc 
 | sonst / lokal | `local-<datum>` | – (keine Updates) | – |
 
 Jede installierte Version prüft beim Start und alle 6 Stunden ihren eigenen Kanal (abschaltbar); mit „Updates automatisch
-installieren“ (Full-Auto-Update, bei neuen Installationen an) wird ohne Rückfrage aktualisiert. Die Cloud liefert in Paketen
+installieren“ (Full-Auto-Update, bei neuen Installationen an) wird ohne Rückfrage aktualisiert. Danach startet die App wieder
+(Windows: sobald der Dienst in der neuen Version läuft, macOS: sobald das Bundle ersetzt ist) – mit ihrem Fenster, wenn das Update
+dort mit „Update installieren“ angestoßen wurde oder das Fenster offen war, sonst still im Tray bzw. in der Menüleiste. Die Cloud liefert in Paketen
 die Desktop-App ihres eigenen Kanals aus (eine lokale Cloud den Release-Kanal, oder eine hochgeladene Datei).
 Compose-Dateien: `docker-compose.yml` (Release), `docker-compose.dev.yml` (Nightly + pgAdmin),
 `docker-compose.local.yml` (aus dem Quellcode gebaut, + pgAdmin, Postgres auf 4957).

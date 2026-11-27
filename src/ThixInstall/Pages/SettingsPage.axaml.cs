@@ -267,6 +267,8 @@ public partial class SettingsPage : UserControl
         try
         {
             PageMessage.Show("Das Update wird geladen – ThixInstall startet danach neu.", InfoSeverity.Info);
+            // Asked for in the window: the window comes back after the update (before the agent starts it: on Windows it ends this app).
+            UpdateService.ShowWindowAfterUpdate();
             await AgentClient.InstallUpdateAsync();
             if (!AgentClient.UsesService)
             {
@@ -275,6 +277,7 @@ public partial class SettingsPage : UserControl
         }
         catch (BusinessException exception)
         {
+            UpdateService.TakeShowWindowAfterUpdate(); // no update: the next start stays as it is
             PageMessage.Show(exception.Message, InfoSeverity.Error);
             InstallUpdateButton.IsEnabled = true;
         }

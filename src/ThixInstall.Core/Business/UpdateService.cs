@@ -202,6 +202,39 @@ public static class UpdateService
         }
     }
 
+    /// <summary>
+    /// The update was asked for in the window (or the window was open): the ThixInstall that starts again after the update shows its window
+    /// instead of waiting in the tray. A marker in the update folder of the app carries this over the restart (the restart itself always says
+    /// "--tray": Windows after the service was updated, macOS when the bundle has been replaced).
+    /// </summary>
+    public static void ShowWindowAfterUpdate()
+    {
+        Directory.CreateDirectory(AppPaths.UpdateDirectory);
+        File.WriteAllText(ShowMarker, DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>True once after an update that should show the window (a marker older than 15 minutes is stale); the marker goes.</summary>
+    public static bool TakeShowWindowAfterUpdate()
+    {
+        if (!File.Exists(ShowMarker))
+        {
+            return false;
+        }
+
+        try
+        {
+            var written = File.GetLastWriteTimeUtc(ShowMarker);
+            File.Delete(ShowMarker);
+            return DateTime.UtcNow - written < TimeSpan.FromMinutes(15);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static string ShowMarker => Path.Combine(AppPaths.UpdateDirectory, "show-window-after-update");
+
     internal static bool IsSafeFileName(string fileName) =>
         fileName.Length > 0 &&
         (fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) &&

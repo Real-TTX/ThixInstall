@@ -84,7 +84,9 @@ src/ThixInstall          (Avalonia app)
                          --quiet|--install / --update / --configure / --uninstall, elevated; a refused option ends with exit code 2;
                          macOS --configure), bundle (ticket → BundleWindow; Windows elevated once), setup assistant, the app
   AgentMonitor           polls the agent status (1.5 s visible / 10 s hidden), raises Status/Jobs/Catalog changes, runs user
-                         scripts for the service, restarts the app when the service was updated
+                         scripts for the service, restarts the app when the service was updated ("--tray"; with the window open,
+                         or the update asked for in Einstellungen › Updates, the marker "show-window-after-update" of UpdateService
+                         in the app's update folder brings the window back once - also after the macOS bundle replacement)
   MainWindow             header (search of the page, refresh, caption buttons), sidebar (Katalog, Updates, Skripte, Aufträge
                          with counts, Einstellungen; running job card, cloud state, version = about), Ctrl/Cmd+1..4 , B F R
   Pages/                 CatalogPage (tiles by category or list; toolbar: category, filter, sort, view; actions below),

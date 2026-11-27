@@ -23,7 +23,8 @@ namespace ThixInstall;
 ///    setup assistant starts with administrator rights).
 ///  - a bundle ticket (appended to the program, a .thixinstall file): the bundle runner (Windows: elevated once).
 ///  - Windows, the published program outside the program folder: the setup assistant.
-///  - everything else: the app (tray / menu bar, main window), one instance per user.
+///  - everything else: the app (tray / menu bar, main window), one instance per user. "--autostart" and "--tray" (after an update) start
+///    hidden - after an update asked for in the window (or with the window open) the window shows again (UpdateService.TakeShowWindowAfterUpdate).
 /// </summary>
 public partial class App : Application
 {
@@ -55,6 +56,9 @@ public partial class App : Application
 
     /// <summary>The main window (null in the setup and the bundle runner).</summary>
     public MainWindow? MainWindow => _mainWindow;
+
+    /// <summary>The main window is on the screen (not only in the tray).</summary>
+    public bool IsMainWindowShown => _mainWindow is { IsVisible: true };
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -142,13 +146,14 @@ public partial class App : Application
         AgentMonitor.IsWindowVisible = () => _mainWindow?.IsVisible == true;
         AgentMonitor.AgentUpdated += (_, _) => RestartAfterServiceUpdate();
         AgentMonitor.JobFinished += (_, job) => NotifyFinished(job);
-        UpdateService.RestartRequested += (_, _) => Ui.Post(ExitApplication);
+        UpdateService.RestartRequested += (_, _) => Ui.Post(EndForUpdate);
 
         _mainWindow = new MainWindow();
         _trayIcon = new TrayIcon(this);
         AgentMonitor.Start();
 
-        var startHidden = args.Contains(TrayArgument) || args.Contains(AutostartService.StartupArgument);
+        // After an update asked for in the window (or with the window open) the window comes back, even though the restart says "--tray".
+        var startHidden = (args.Contains(TrayArgument) || args.Contains(AutostartService.StartupArgument)) && !UpdateService.TakeShowWindowAfterUpdate();
         if (!startHidden)
         {
             _mainWindow.ShowFromTray();
@@ -252,8 +257,37 @@ public partial class App : Application
 
         _instanceMutex?.Dispose();
         _instanceMutex = null;
+        RememberWindowForUpdate();
         InstallService.StartInstalled(TrayArgument);
         ExitApplication();
+    }
+
+    /// <summary>The agent in this process started an automatic update (macOS: the bundle is replaced once the app has ended).</summary>
+    private void EndForUpdate()
+    {
+        RememberWindowForUpdate();
+        ExitApplication();
+    }
+
+    /// <summary>
+    /// With the window open the new ThixInstall shows it again after the update; otherwise it starts in the tray, unless the update was asked
+    /// for in the window (Einstellungen › Updates writes the marker itself).
+    /// </summary>
+    private void RememberWindowForUpdate()
+    {
+        if (!IsMainWindowShown)
+        {
+            return;
+        }
+
+        try
+        {
+            UpdateService.ShowWindowAfterUpdate();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Log.Warning($"Could not remember the window for the update: {exception.Message}");
+        }
     }
 
     // ---- Windows setup ------------------------------------------------------------------------------------------------
